@@ -119,7 +119,7 @@
 
 <script>
 /* ===== OCR 설정: 배포한 Cloudflare Worker 주소를 여기에 넣으세요 ===== */
-const WORKER_URL = "https://curly-wood-29f5.shatsong.workers.dev";
+const WORKER_URL = "https://bitter-recipe-b833.shatsong.workers.dev";
 
 /* ===================== 규칙엔진 ===================== */
 const CATEGORIES = ['활어회','해산물','초밥','탕·찜·전골','정육·구이','일반단품','주류','음료','점심·특선','세트·코스'];
@@ -236,29 +236,28 @@ async function handlePhotos(files){
     setStatus('⚠ 코드 상단 WORKER_URL을 먼저 입력해주세요. (지금은 텍스트 입력으로 테스트 가능)');
     return;
   }
-  setStatus('<span class="spin"></span>사진에서 글자를 읽는 중...');
+  setStatus('<span class="spin"></span>사진 읽는 중... (OCR → AI 정리, 10~20초 소요)');
   let allLines=[];
   for(const f of files){
     try{
       const b64 = await resizeImage(f);
       const r = await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64})});
       const j = await r.json();
-      // Vision API 에러 감지 → 화면 표시
       if(j.error){
-        setStatus('⚠ Vision API 오류: '+j.error.message+' (코드 '+j.error.code+')');
+        const msg = j.error.message || JSON.stringify(j.error);
+        const code = j.error.code ? ' (코드 '+j.error.code+')' : '';
+        setStatus('⚠ 오류: '+msg+code);
         return;
       }
-      if(j.responses && j.responses[0] && j.responses[0].error){
-        setStatus('⚠ Vision API 오류: '+j.responses[0].error.message);
-        return;
+      if(j.text){
+        const lines = j.text.split('\n').map(l=>l.trim()).filter(Boolean);
+        allLines = allLines.concat(lines);
       }
-      const ann = (j.responses && j.responses[0] && j.responses[0].textAnnotations) || [];
-      allLines = allLines.concat(visionToLines(ann.slice(1)));
     }catch(e){ console.error(e); setStatus('⚠ 읽기 실패: '+String(e)); return; }
   }
   const ta=document.getElementById('raw');
   ta.value = (ta.value?ta.value+'\n':'') + allLines.join('\n');
-  setStatus('✓ '+allLines.length+'줄을 불러왔어요. 아래에서 확인 후 정리하세요.');
+  setStatus('✓ '+allLines.length+'개 메뉴를 정리했어요. 확인 후 수정하세요.');
   document.getElementById('fileCamera').value='';
   document.getElementById('fileGallery').value='';
 }
