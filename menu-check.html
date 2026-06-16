@@ -243,14 +243,24 @@ async function handlePhotos(files){
       const b64 = await resizeImage(f);
       const r = await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64})});
       const j = await r.json();
+      // Vision API 에러 감지 → 화면 표시
+      if(j.error){
+        setStatus('⚠ Vision API 오류: '+j.error.message+' (코드 '+j.error.code+')');
+        return;
+      }
+      if(j.responses && j.responses[0] && j.responses[0].error){
+        setStatus('⚠ Vision API 오류: '+j.responses[0].error.message);
+        return;
+      }
       const ann = (j.responses && j.responses[0] && j.responses[0].textAnnotations) || [];
       allLines = allLines.concat(visionToLines(ann.slice(1)));
-    }catch(e){ console.error(e); setStatus('⚠ 읽기 실패. 네트워크나 OCR 주소를 확인해주세요.'); return; }
+    }catch(e){ console.error(e); setStatus('⚠ 읽기 실패: '+String(e)); return; }
   }
   const ta=document.getElementById('raw');
   ta.value = (ta.value?ta.value+'\n':'') + allLines.join('\n');
   setStatus('✓ '+allLines.length+'줄을 불러왔어요. 아래에서 확인 후 정리하세요.');
-  document.getElementById('file').value='';
+  document.getElementById('fileCamera').value='';
+  document.getElementById('fileGallery').value='';
 }
 function setStatus(html){const s=document.getElementById('status');s.innerHTML=html;s.classList.add('show');}
 
