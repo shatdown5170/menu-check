@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>메뉴 검수</title>
+<style>
+  :root{
+    --orange:#F96B2C; --orange-soft:#FFF1EA; --ink:#1A1A1A; --gray:#8E8E93;
+    --line:#ECECEC; --bg:#FFFFFF; --card:#F7F7F8; --green:#2BA84A; --red:#E5453A; --radius:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;}
+  body{padding-bottom:120px;}
+  .top{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);padding:18px 20px 14px;}
+  .top h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.4px;}
+  .top p{margin:4px 0 0;font-size:14px;color:var(--gray);}
+  .steps{display:flex;gap:6px;margin-top:14px;}
+  .steps .dot{height:4px;flex:1;border-radius:99px;background:var(--line);transition:.25s;}
+  .steps .dot.on{background:var(--orange);}
+  .page{padding:20px;display:none;}
+  .page.show{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  label.fld{display:block;font-size:13px;font-weight:700;color:var(--gray);margin:0 0 8px 2px;}
+  textarea,input,select{font-family:inherit;font-size:16px;color:var(--ink);}
+  textarea{width:100%;min-height:180px;border:1.5px solid var(--line);border-radius:var(--radius);padding:16px;resize:vertical;line-height:1.6;}
+  textarea:focus,input:focus,select:focus{outline:none;border-color:var(--orange);}
+  .hint{font-size:13px;color:var(--gray);line-height:1.6;margin:10px 2px 0;}
+  .ghost{display:block;width:100%;margin-top:14px;padding:16px;border:1.5px dashed var(--orange);
+    background:var(--orange-soft);color:var(--orange);font-size:16px;font-weight:700;border-radius:var(--radius);}
+  .photo{display:block;width:100%;padding:22px;border:1.5px solid var(--orange);background:var(--orange);
+    color:#fff;font-size:17px;font-weight:800;border-radius:var(--radius);text-align:center;margin-bottom:6px;}
+  .or{text-align:center;color:var(--gray);font-size:13px;margin:18px 0 12px;position:relative;}
+  .or::before,.or::after{content:"";position:absolute;top:50%;width:38%;height:1px;background:var(--line);}
+  .or::before{left:0;} .or::after{right:0;}
+  .status{margin-top:12px;font-size:14px;color:var(--orange);font-weight:700;text-align:center;display:none;}
+  .status.show{display:block;}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--orange-soft);border-top-color:var(--orange);
+    border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .row{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
+  .row .line{display:flex;gap:8px;align-items:center;}
+  .row input.name{flex:1;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fff;}
+  .row input.price{width:96px;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fff;text-align:right;}
+  .row .sub{display:flex;gap:8px;align-items:center;margin-top:10px;}
+  .row select{flex:1;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fff
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' stroke='%238E8E93' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>")
+    no-repeat right 12px center;-webkit-appearance:none;appearance:none;}
+  .row .del{width:40px;height:40px;flex:none;border:none;background:#fff;border-radius:10px;color:var(--gray);font-size:18px;}
+  .badge{display:inline-block;margin-top:10px;font-size:13px;font-weight:700;line-height:1.5;
+    background:var(--orange-soft);color:var(--orange);padding:8px 12px;border-radius:10px;}
+  .badge.ok{background:#EAF7EE;color:var(--green);}
+  .fill{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;}
+  .fill .mname{font-size:17px;font-weight:800;margin-bottom:2px;}
+  .fill .ask{font-size:13px;color:var(--orange);font-weight:700;margin:12px 0 6px;}
+  .fill .askn{font-size:12px;color:var(--gray);font-weight:600;margin-left:4px;}
+  .fill input.ans{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;}
+  .seg{display:flex;gap:8px;}
+  .seg button{flex:1;padding:12px;border:1.5px solid var(--line);background:#fff;border-radius:10px;font-size:15px;font-weight:700;color:var(--ink);}
+  .seg button.sel{border-color:var(--orange);background:var(--orange-soft);color:var(--orange);}
+  .out{background:var(--card);border-radius:var(--radius);padding:16px;white-space:pre-wrap;font-size:15px;line-height:1.75;}
+  .out h3{margin:0 0 10px;font-size:14px;color:var(--gray);font-weight:700;}
+  .out + .out{margin-top:14px;}
+  .footer{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(transparent,#fff 22%);padding:14px 20px 22px;display:flex;gap:10px;}
+  .btn{flex:1;border:none;border-radius:14px;padding:18px;font-size:17px;font-weight:800;}
+  .btn.primary{background:var(--orange);color:#fff;}
+  .btn.primary:disabled{background:#F4C3AC;}
+  .btn.sub{flex:none;width:64px;background:var(--card);color:var(--ink);}
+  .empty{text-align:center;color:var(--gray);padding:40px 0;font-size:15px;line-height:1.6;}
+  .toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:12px 20px;border-radius:99px;font-size:14px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:50;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1 id="title">메뉴 입력</h1>
+  <p id="subtitle">메뉴판 사진을 찍거나 텍스트를 붙여넣으세요</p>
+  <div class="steps">
+    <div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+  </div>
+</div>
+
+<!-- STEP 0 -->
+<div class="page show" id="p0">
+  <button class="photo" onclick="document.getElementById('fileCamera').click()">📷 카메라로 촬영</button>
+  <button class="photo" style="background:#fff;color:var(--orange);border:1.5px solid var(--orange);" onclick="document.getElementById('fileGallery').click()">🖼 사진첩에서 선택</button>
+  <input id="fileCamera" type="file" accept="image/*" capture="environment" style="display:none" onchange="handlePhotos(this.files)">
+  <input id="fileGallery" type="file" accept="image/*" multiple style="display:none" onchange="handlePhotos(this.files)">
+  <div class="status" id="status"></div>
+  <div class="or">또는 직접 입력</div>
+  <textarea id="raw" placeholder="한 줄에 메뉴 하나씩&#10;예) 모둠초밥 25,000&#10;참치초밥 8000&#10;우럭 매운탕 35,000원"></textarea>
+  <button class="ghost" onclick="loadSample()">샘플 메뉴 불러오기</button>
+</div>
+
+<!-- STEP 1 -->
+<div class="page" id="p1">
+  <div id="rows"></div>
+  <button class="ghost" onclick="addRow()">+ 메뉴 직접 추가</button>
+</div>
+
+<!-- STEP 2 -->
+<div class="page" id="p2"><div id="fills"></div></div>
+
+<!-- STEP 3 -->
+<div class="page" id="p3">
+  <div class="out"><h3>정리된 메뉴판</h3><div id="outMenu"></div></div>
+  <div class="out"><h3>세일즈 확인 요청 요약</h3><div id="outAsk"></div></div>
+</div>
+
+<div class="footer">
+  <button class="btn sub" id="backBtn" onclick="go(-1)" style="display:none">이전</button>
+  <button class="btn primary" id="nextBtn" onclick="go(1)">메뉴 정리하기</button>
+</div>
+
+<div class="toast" id="toast">복사했어요</div>
+
+<script>
+/* ===== OCR 설정: 배포한 Cloudflare Worker 주소를 여기에 넣으세요 ===== */
+const WORKER_URL = "https://curly-wood-29f5.shatsong.workers.dev";
+
+/* ===================== 규칙엔진 ===================== */
+const CATEGORIES = ['활어회','해산물','초밥','탕·찜·전골','정육·구이','일반단품','주류','음료','점심·특선','세트·코스'];
+const SEAFOOD_COOKED = ['간장게장','양념게장','새우장','전복장','새우찜','홍합탕','전복버터구이','오징어볶음','한치물회','전복물회','고등어구이'];
+const SIDE_MODUM = ['모둠버섯','모둠사리','모둠튀김','모둠어묵탕','모둠감자','모둠소세지','모둠소시지','모둠수육','모둠순대'];
+const NOODLE_HOE_PASS = ['물회','막국수','냉면','비빔국수'];
+
+const norm = s => (s||'').replace(/\s/g,'');
+const inList = (name,list) => list.some(w => norm(name).includes(w));
+
+function guessCategory(name){
+  const n = norm(name);
+  if(/초밥|스시/.test(n)) return '초밥';
+  if(/점심|특선|런치/.test(n)) return '점심·특선';
+  if(/소주|맥주|막걸리|와인|테라|카스|참이슬|처음처럼|하이볼|사케|청하|클라우드|켈리|진로|위스키|보드카|생맥/.test(n)) return '주류';
+  if(/콜라|사이다|제로|환타|스프라이트|주스|생수|음료|에이드|아메리카노|커피/.test(n)) return '음료';
+  if(/세트|코스|스페셜/.test(n)) return '세트·코스';
+  if(/탕|전골|찜|찌개|샤브/.test(n)) return '탕·찜·전골';
+  if(/회|사시미/.test(n)) return '활어회';
+  if(/게장|새우|전복|홍합|오징어|문어|조개|굴|낙지|꼬막|대게|킹크랩|해산물/.test(n)) return '해산물';
+  if(/구이|스테이크|삼겹|목살|등심|갈비|불고기|차돌|항정/.test(n)) return '정육·구이';
+  return '일반단품';
+}
+
+const det = {
+  hasP:       n => /\d+\s*(P|피스|pc)/i.test(n),
+  hasCount:   n => /\d+\s*(개|점|P|피스|pc)/i.test(n),
+  hasComp:    n => n.includes('+'),
+  hasPortion: n => /인분|인용|\d+\s*인|사이즈|\((대|중|소)\)|(대|중|소)\s*\/\s*(대|중|소)/.test(n),
+  hasVolume:  n => /\d+\s*(ml|l|리터|cc)/i.test(n),
+  hasTime:    n => /\d+\s*시|\d{1,2}:\d{2}|오전|오후|런치타임|~/.test(n),
+  isMarket:   s => /싯가|시가|당일시가|시세/.test(s),
+};
+
+function inspect(item, globalCook){
+  const n = item.name, cat = item.cat, price = item.price||'';
+  let flags = [];
+
+  // A. 조리/비조리
+  if(cat==='탕·찜·전골' || cat==='정육·구이'){
+    const pass = /조림/.test(norm(n)) || inList(n,NOODLE_HOE_PASS) || inList(n,SEAFOOD_COOKED) || globalCook;
+    if(!pass && /탕|전골|찜|찌개|샤브|구이/.test(norm(n))) flags.push('조리/비조리 확인');
+  }
+  // B. 초밥
+  if(/초밥|스시/.test(norm(n))){
+    if(/모둠/.test(norm(n))){
+      if(!det.hasP(n)) flags.push('총 피스(P)수 확인');
+      if(!det.hasComp(n)) flags.push('구성 종류 확인');
+    } else if(!det.hasCount(n)) flags.push('제공 갯수 확인');
+  }
+  // C. 구성·양  ── 모둠회처럼 둘 다 필요한 경우 둘 다 잡힘
+  if(cat==='활어회' || cat==='해산물' || cat==='세트·코스'){
+    const fullPass = det.hasComp(n) || inList(n,SIDE_MODUM) || inList(n,SEAFOOD_COOKED);
+    if(!fullPass){
+      // 구성 (메인 모둠/세트/코스)
+      if(/모둠|스페셜|세트|코스/.test(norm(n))) flags.push('구성 종류 확인');
+      // 양 (활어회·해산물 단품)
+      if((cat==='활어회' || cat==='해산물') && !(det.hasPortion(n)||det.hasCount(n)||det.hasVolume(n)))
+        flags.push('양 기준(인분/사이즈) 확인');
+    }
+  }
+  // D. 가격 (항상)
+  if(det.isMarket(n) || det.isMarket(price)) flags.push('고정 판매가 확인');
+  else if(!price || norm(price)==='') flags.push('판매 가격 확인');
+  // E. 주류·음료
+  if((cat==='주류' || cat==='음료') && !det.hasVolume(n)) flags.push('용량(mL/L) 확인');
+  // F. 점심·특선
+  if(/점심|특선|런치/.test(norm(n)) && !det.hasTime(n)) flags.push('판매 시간대 확인');
+
+  return [...new Set(flags)];
+}
+
+/* ===================== 상태 ===================== */
+let step = 0, items = [], globalCook = false;
+
+/* ===================== OCR ===================== */
+const resizeImage = (file,maxDim=1600) => new Promise(res=>{
+  const img=new Image(), url=URL.createObjectURL(file);
+  img.onload=()=>{
+    let w=img.width,h=img.height;
+    if(Math.max(w,h)>maxDim){const s=maxDim/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(url);
+    res(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+  };
+  img.onerror=()=>res(null); img.src=url;
+});
+
+// Vision 단어+좌표 → 줄 단위 텍스트
+function visionToLines(words){
+  if(!words||!words.length) return [];
+  const ws = words.map(w=>{
+    const v=w.boundingPoly.vertices;
+    const xs=v.map(p=>p.x||0), ys=v.map(p=>p.y||0);
+    return {t:w.description, x:Math.min(...xs), yc:(Math.min(...ys)+Math.max(...ys))/2, h:Math.max(...ys)-Math.min(...ys)};
+  });
+  const avgH = ws.reduce((s,w)=>s+w.h,0)/ws.length;
+  ws.sort((a,b)=>a.yc-b.yc);
+  const lines=[]; let cur=[];
+  ws.forEach(w=>{
+    if(!cur.length){cur.push(w);return;}
+    const refY=cur.reduce((s,x)=>s+x.yc,0)/cur.length;
+    if(Math.abs(w.yc-refY)>avgH*0.6){lines.push(cur);cur=[w];} else cur.push(w);
+  });
+  if(cur.length) lines.push(cur);
+  return lines.map(l=>l.sort((a,b)=>a.x-b.x).map(w=>w.t).join(' '));
+}
+
+async function handlePhotos(files){
+  if(!files.length) return;
+  if(!WORKER_URL){
+    flash('OCR 주소(WORKER_URL)가 설정되지 않았어요');
+    setStatus('⚠ 코드 상단 WORKER_URL을 먼저 입력해주세요. (지금은 텍스트 입력으로 테스트 가능)');
+    return;
+  }
+  setStatus('<span class="spin"></span>사진에서 글자를 읽는 중...');
+  let allLines=[];
+  for(const f of files){
+    try{
+      const b64 = await resizeImage(f);
+      const r = await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:b64})});
+      const j = await r.json();
+      const ann = (j.responses && j.responses[0] && j.responses[0].textAnnotations) || [];
+      allLines = allLines.concat(visionToLines(ann.slice(1)));
+    }catch(e){ console.error(e); setStatus('⚠ 읽기 실패. 네트워크나 OCR 주소를 확인해주세요.'); return; }
+  }
+  const ta=document.getElementById('raw');
+  ta.value = (ta.value?ta.value+'\n':'') + allLines.join('\n');
+  setStatus('✓ '+allLines.length+'줄을 불러왔어요. 아래에서 확인 후 정리하세요.');
+  document.getElementById('file').value='';
+}
+function setStatus(html){const s=document.getElementById('status');s.innerHTML=html;s.classList.add('show');}
+
+/* ===================== 입력 파싱 ===================== */
+function parseRaw(){
+  return document.getElementById('raw').value.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const m=line.match(/([\d][\d,]*)\s*원?\s*$/);
+    let price='',name=line;
+    if(m){price=m[1].replace(/,/g,'');name=line.slice(0,m.index).trim();}
+    if(/싯가|시가|당일시가|시세/.test(line)) price='';
+    if(!name) name=line;
+    return {name,price,cat:guessCategory(name),answers:{}};
+  });
+}
+function loadSample(){
+  document.getElementById('raw').value=
+`모둠회
+모둠초밥 25,000
+참치초밥 8,000
+우럭 매운탕 35,000
+갈치조림 22,000
+간장게장 39,000
+모둠수육 30,000
+테라 7,000
+점심특선 9,000
+광어회 시가`;
+}
+
+/* ===================== 렌더 ===================== */
+const esc = s => (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const fmtPrice = p => p?Number(p).toLocaleString()+'원':'';
+
+function renderRows(){
+  const box=document.getElementById('rows');
+  if(!items.length){box.innerHTML='<div class="empty">입력된 메뉴가 없어요.<br>이전 화면에서 메뉴를 입력해주세요.</div>';return;}
+  box.innerHTML='';
+  items.forEach((it,i)=>{
+    it.flags=inspect(it,globalCook);
+    const opts=CATEGORIES.map(c=>`<option ${c===it.cat?'selected':''}>${c}</option>`).join('');
+    const badge=it.flags.length?`<div class="badge">${it.flags.join(' / ')}</div>`:`<div class="badge ok">✓ 추가 확인 필요 없음</div>`;
+    const el=document.createElement('div');el.className='row';
+    el.innerHTML=`
+      <div class="line">
+        <input class="name" value="${esc(it.name)}" oninput="upd(${i},'name',this.value)" placeholder="메뉴명">
+        <input class="price" value="${it.price?Number(it.price).toLocaleString():''}" oninput="upd(${i},'price',this.value)" placeholder="가격" inputmode="numeric">
+      </div>
+      <div class="sub"><select onchange="upd(${i},'cat',this.value)">${opts}</select>
+      <button class="del" onclick="delRow(${i})">✕</button></div>
+      ${badge}`;
+    box.appendChild(el);
+  });
+}
+function upd(i,key,val){
+  if(key==='price') val=val.replace(/[^\d]/g,'');
+  items[i][key]=val;
+  if(key==='cat'||key==='name') renderRows();
+}
+function addRow(){items.push({name:'',price:'',cat:'일반단품',answers:{}});renderRows();}
+function delRow(i){items.splice(i,1);renderRows();}
+
+function renderFills(){
+  const box=document.getElementById('fills');
+  const need=items.map((it,i)=>({it,i})).filter(x=>x.it.flags.length);
+  if(!need.length){box.innerHTML='<div class="empty">추가로 확인할 항목이 없어요. 🎉<br>바로 출력으로 넘어가세요.</div>';return;}
+  box.innerHTML='';
+  need.forEach(({it,i})=>{
+    let inner=`<div class="mname">${esc(it.name)||'(이름 없음)'}</div>`;
+    it.flags.forEach(f=>{
+      if(f.includes('조리/비조리')){
+        const cur=(it.answers[f]||'').split(',').map(s=>s.trim()).filter(Boolean);
+        inner+=`<div class="ask">${f} <span class="askn">(둘 다 판매 시 모두 선택)</span></div>
+          <div class="seg">
+            <button class="${cur.includes('조리')?'sel':''}" onclick="toggleCook(${i},'${f}','조리')">조리</button>
+            <button class="${cur.includes('비조리')?'sel':''}" onclick="toggleCook(${i},'${f}','비조리')">비조리</button>
+          </div>`;
+      } else {
+        inner+=`<div class="ask">${f}</div>
+          <input class="ans" value="${esc(it.answers[f]||'')}" placeholder="사장님께 받은 내용 입력" oninput="setAns(${i},'${esc(f)}',this.value)">`;
+      }
+    });
+    const el=document.createElement('div');el.className='fill';el.innerHTML=inner;box.appendChild(el);
+  });
+}
+function setAns(i,f,v){items[i].answers[f]=v;}
+function toggleCook(i,f,val){
+  const cur=(items[i].answers[f]||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const k=cur.indexOf(val); if(k>=0) cur.splice(k,1); else cur.push(val);
+  items[i].answers[f]=['조리','비조리'].filter(o=>cur.includes(o)).join(', ');
+  renderFills();
+}
+
+function renderOut(){
+  let menu=items.filter(it=>it.name).map(it=>{
+    let line=it.name; if(it.price) line+='  '+fmtPrice(it.price);
+    const ans=it.flags.map(f=>it.answers[f]).filter(Boolean);
+    if(ans.length) line+='  ('+ans.join(' / ')+')';
+    return line;
+  }).join('\n');
+  document.getElementById('outMenu').textContent=menu||'메뉴가 없습니다.';
+  let ask=items.filter(it=>it.flags.length).map(it=>{
+    const remain=it.flags.filter(f=>!it.answers[f]);
+    return remain.length?`${it.name} : ${remain.join(' / ')}`:null;
+  }).filter(Boolean).join('\n');
+  document.getElementById('outAsk').textContent=ask||'모두 확인 완료되었습니다. ✓';
+}
+
+/* ===================== 네비게이션 ===================== */
+const titles=[
+  ['메뉴 입력','메뉴판 사진을 찍거나 텍스트를 붙여넣으세요'],
+  ['메뉴 확인','내용·가격·카테고리를 확인하고 고쳐주세요'],
+  ['확인사항 입력','사장님께 받아온 내용을 채워주세요'],
+  ['최종 정리','복사해서 그대로 붙여넣으세요'],
+];
+const nextLabels=['메뉴 정리하기','확인사항 보기','최종 정리하기','복사하기'];
+
+function go(dir){
+  if(dir>0){
+    if(step===0){items=parseRaw();if(!items.length){flash('메뉴를 입력해주세요');return;}}
+    if(step===3){copyAll();return;}
+    step++;
+  } else step--;
+  render();
+}
+function render(){
+  document.querySelectorAll('.page').forEach((p,i)=>p.classList.toggle('show',i===step));
+  document.querySelectorAll('.steps .dot').forEach((d,i)=>d.classList.toggle('on',i<=step));
+  document.getElementById('title').textContent=titles[step][0];
+  document.getElementById('subtitle').textContent=titles[step][1];
+  document.getElementById('nextBtn').textContent=nextLabels[step];
+  document.getElementById('backBtn').style.display=step===0?'none':'block';
+  if(step===1) renderRows();
+  if(step===2){items.forEach(it=>it.flags=inspect(it,globalCook));renderFills();}
+  if(step===3) renderOut();
+  window.scrollTo(0,0);
+}
+function copyAll(){
+  const t=document.getElementById('outMenu').textContent+'\n\n[확인 요청]\n'+document.getElementById('outAsk').textContent;
+  navigator.clipboard.writeText(t).then(()=>flash('복사했어요')).catch(()=>flash('복사 실패'));
+}
+let toastT;
+function flash(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1600);}
+</script>
+</body>
+</html>
