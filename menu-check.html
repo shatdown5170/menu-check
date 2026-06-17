@@ -373,9 +373,9 @@ async function handlePhotos(files){
     const r = await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'clean',text:combined})});
     const j = await r.json();
     if(j.error){
-      const msg = j.error.message || JSON.stringify(j.error);
-      const code = j.error.code ? ' (코드 '+j.error.code+')' : '';
-      setStatus('⚠ 정리 오류: '+msg+code); return;
+      // j.error 가 문자열일 수도, 객체일 수도 있음 → 모두 대응
+      const msg = (typeof j.error === 'string') ? j.error : (j.error.message || JSON.stringify(j.error));
+      setStatus('⚠ 정리 오류 [HTTP '+r.status+']: '+msg); return;
     }
     cleaned = j.text||'';
   }catch(e){ console.error(e); setStatus('⚠ 정리 실패: '+String(e)); return; }
