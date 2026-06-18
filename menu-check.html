@@ -354,52 +354,39 @@ function visionToLines(words){
 async function handlePhotos(files){
   if(!files.length) return;
   if(!WORKER_URL){
-    flash('OCR 주소(WORKER_URL)가 설정되지 않았어요');
+    flash('서버 주소(WORKER_URL)가 설정되지 않았어요');
     setStatus('⚠ 코드 상단 WORKER_URL을 먼저 입력해주세요. (지금은 텍스트 입력으로 테스트 가능)');
     return;
   }
   const fileArr = Array.from(files);
   const total = fileArr.length;
 
-  // ── Step 1: 전 장 병렬 OCR (Vision만, mode:"ocr") ──
-  let done = 0;
-  setStatus('<span class="spin"></span>사진 읽는 중... (0/'+total+'장)');
-  const ocrCall = async (f)=>{
-    try{
-      const b64 = await resizeImage(f);
-      if(!b64) return '';
-      const r = await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'ocr',image:b64})});
-      const j = await r.json();
-      done++;
-      setStatus('<span class="spin"></span>사진 읽는 중... ('+done+'/'+total+'장)');
-      if(j.error){ throw new Error(j.error.message||JSON.stringify(j.error)); }
-      return j.text||'';
-    }catch(e){ done++; throw e; }
-  };
-
-  let rawTexts;
-  try{
-    rawTexts = await Promise.all(fileArr.map(ocrCall));
-  }catch(e){
-    console.error(e); setStatus('⚠ 읽기 실패: '+String(e.message||e)); return;
+  // ── 모든 이미지를 base64로 변환 (고해상도 위해 maxDim 2000) ──
+  setStatus('<span class="spin"></span>사진 준비 중... (0/'+total+'장)');
+  const imagesB64 = [];
+  for(let i=0;i<fileArr.length;i++){
+    const b64 = await resizeImage(fileArr[i], 2000);
+    if(b64) imagesB64.push(b64);
+    setStatus('<span class="spin"></span>사진 준비 중... ('+(i+1)+'/'+total+'장)');
   }
+  if(!imagesB64.length){ setStatus('⚠ 이미지를 처리하지 못했어요. 다시 시도해주세요.'); resetFileInputs(); return; }
 
-  const combined = rawTexts.filter(Boolean).join('\n\n');
-  if(!combined.trim()){ setStatus('⚠ 글자를 찾지 못했어요. 사진을 다시 확인해주세요.'); resetFileInputs(); return; }
-
-  // ── Step 2: 합본을 Gemini로 1번 정리 (mode:"clean") ──
-  setStatus('<span class="spin"></span>AI가 메뉴를 정리하는 중...');
+  // ── 이미지를 Claude Vision으로 직접 분석 (1번 호출) ──
+  setStatus('<span class="spin"></span>AI가 메뉴판을 읽고 정리하는 중...');
   let cleaned='';
   try{
-    const r = await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'clean',text:combined})});
+    const r = await fetch(WORKER_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ mode:'vision', images:imagesB64, mediaTypes:imagesB64.map(()=> 'image/jpeg') })
+    });
     const j = await r.json();
     if(j.error){
-      // j.error 가 문자열일 수도, 객체일 수도 있음 → 모두 대응
       const msg = (typeof j.error === 'string') ? j.error : (j.error.message || JSON.stringify(j.error));
-      setStatus('⚠ 정리 오류 [HTTP '+r.status+']: '+msg); return;
+      setStatus('⚠ 분석 오류 [HTTP '+r.status+']: '+msg); return;
     }
     cleaned = j.text||'';
-  }catch(e){ console.error(e); setStatus('⚠ 정리 실패: '+String(e)); return; }
+  }catch(e){ console.error(e); setStatus('⚠ 분석 실패: '+String(e)); return; }
 
   const lines = cleaned.split('\n').map(l=>l.trim()).filter(Boolean);
   if(!lines.length){ setStatus('⚠ 메뉴를 추출하지 못했어요. 사진을 다시 확인하거나 직접 입력해주세요.'); resetFileInputs(); return; }
