@@ -115,6 +115,8 @@
   .fill .askn{font-size:12px;color:var(--gray);font-weight:500;margin-left:4px;}
   .fill input.ans{width:100%;border:none;border-radius:8px;padding:11px 12px;background:var(--hover);font-size:15px;}
   .fill input.ans:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;}
+  .fill select.ansSel{width:100%;border:none;border-radius:8px;padding:11px 12px;background:var(--hover);font-size:15px;}
+  .fill select.ansSel:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;}
   .seg{display:flex;gap:8px;}
   .seg button{flex:1;padding:11px;border:1px solid var(--line);background:#fff;border-radius:var(--radius);font-size:14.5px;font-weight:500;color:var(--gray2);}
   .seg button.sel{border-color:var(--blue);background:var(--blue-soft);color:var(--blue);font-weight:600;}
@@ -197,6 +199,25 @@ const WORKER_URL = "https://bitter-recipe-b833.shatsong.workers.dev";
 
 /* ===================== 규칙엔진 ===================== */
 const CATEGORIES = ['밥류','면류','탕찜전골','정육구이','해산물','세트코스','초밥','주류','음료','일반'];
+
+/* 검수 항목별 드롭다운 선택지. 항목명에 포함된 키워드로 매칭.
+   '직접 입력'을 고르면 자유 입력칸이 나타남. */
+const FILL_OPTIONS = [
+  {match:'조리/비조리', options:['조리','비조리','둘 다 판매','직접 입력']},
+  {match:'총 피스',     options:['8P','10P','12P','15P','20P','직접 입력']},
+  {match:'구성 종류',   options:['메뉴판에 구성 기재됨','사장님 구두 확인 완료','구성 변동 가능','직접 입력']},
+  {match:'제공 갯수',   options:['1개','2개','3개','4개','직접 입력']},
+  {match:'양 기준',     options:['1인분','2인분','3인분','소(小)','중(中)','대(大)','직접 입력']},
+  {match:'주류 가격 분리',options:['주류 가격 별도','세트가에 포함','직접 입력']},
+  {match:'고정 판매가', options:['시가(변동)','고정가 확인','직접 입력']},
+  {match:'판매 가격',   options:['직접 입력']},
+  {match:'용량',        options:['355mL','500mL','355mL/500mL','1L','직접 입력']},
+  {match:'판매 시간대', options:['점심 한정(11~15시)','종일 판매','직접 입력']},
+];
+function fillOptionsFor(flag){
+  const hit=FILL_OPTIONS.find(o=>flag.includes(o.match));
+  return hit?hit.options:['직접 입력'];
+}
 // 카테고리 → Notion 태그 색상 (배경, 글자)
 const CAT_COLOR = {
   '밥류':['#FBF3DB','#947101'], '면류':['#FAEBDD','#A8693B'], '탕찜전골':['#FBE4E4','#B3403A'],
@@ -471,7 +492,21 @@ function renderRows(){
 function upd(i,key,val){
   if(key==='price') val=val.replace(/[^\d]/g,'');
   items[i][key]=val;
-  if(key==='cat'||key==='name') renderRows();
+  // 카테고리 변경만 전체 재렌더(드롭다운은 포커스 유지됨).
+  // 이름/가격은 input에 이미 글자가 들어가 있으므로 재렌더하지 않고 badge만 갱신 → 키보드 유지
+  if(key==='cat'){ renderRows(); }
+  else { refreshBadge(i); }
+}
+function refreshBadge(i){
+  const rows=document.getElementById('rows').querySelectorAll('.row');
+  const el=rows[i]; if(!el) return;
+  const it=items[i];
+  it.flags=inspect(it,globalCook);
+  const badge=it.flags.length
+    ?`<div class="badge">${it.flags.map(f=>`<span class="pill">${f}</span>`).join('')}</div>`
+    :`<div class="badge ok"><span class="pill">✓ 추가 확인 필요 없음</span></div>`;
+  const old=el.querySelector('.badge');
+  if(old){ old.outerHTML=badge; }
 }
 function addRow(){items.push({name:'',price:'',cat:'일반',answers:{}});renderRows();}
 function delRow(i){items.splice(i,1);renderRows();}
@@ -492,14 +527,34 @@ function renderFills(){
             <button class="${cur.includes('비조리')?'sel':''}" onclick="toggleCook(${i},'${f}','비조리')">비조리</button>
           </div>`;
       } else {
+        const opts=fillOptionsFor(f);
+        const cur=it.answers[f]||'';
+        // 현재 값이 드롭다운 선택지에 있으면 그걸 선택, 없으면(자유 입력값) '직접 입력' 모드
+        const isPreset=opts.includes(cur);
+        const showCustom = (cur!=='' && !isPreset);
+        const selVal = showCustom ? '직접 입력' : cur;
+        const optHtml=['<option value="">선택…</option>']
+          .concat(opts.map(o=>`<option value="${esc(o)}" ${o===selVal?'selected':''}>${o}</option>`)).join('');
         inner+=`<div class="ask">${f}</div>
-          <input class="ans" value="${esc(it.answers[f]||'')}" placeholder="사장님께 받은 내용 입력" oninput="setAns(${i},'${esc(f)}',this.value)">`;
+          <select class="ansSel" onchange="setAnsSel(${i},'${esc(f)}',this)">${optHtml}</select>
+          <input class="ans" style="margin-top:6px;${showCustom?'':'display:none'}" value="${showCustom?esc(cur):''}" placeholder="직접 입력" oninput="setAns(${i},'${esc(f)}',this.value)">`;
       }
     });
     const el=document.createElement('div');el.className='fill';el.innerHTML=inner;box.appendChild(el);
   });
 }
 function setAns(i,f,v){items[i].answers[f]=v;}
+function setAnsSel(i,f,sel){
+  const v=sel.value;
+  const custom=sel.parentElement.querySelector('.ans');
+  if(v==='직접 입력'){
+    if(custom){ custom.style.display=''; custom.value=''; custom.focus(); }
+    items[i].answers[f]='';
+  } else {
+    if(custom){ custom.style.display='none'; custom.value=''; }
+    items[i].answers[f]=v;
+  }
+}
 function toggleCook(i,f,val){
   const cur=(items[i].answers[f]||'').split(',').map(s=>s.trim()).filter(Boolean);
   const k=cur.indexOf(val); if(k>=0) cur.splice(k,1); else cur.push(val);
