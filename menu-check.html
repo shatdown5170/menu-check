@@ -212,6 +212,7 @@ const FILL_OPTIONS = [
   {match:'고정 판매가', options:['시가(변동)','고정가 확인','직접 입력']},
   {match:'판매 가격',   options:['직접 입력']},
   {match:'용량',        options:['355mL','500mL','355mL/500mL','1L','직접 입력']},
+  {match:'구체적 품명', options:['직접 입력']},
   {match:'판매 시간대', options:['점심 한정(11~15시)','종일 판매','직접 입력']},
 ];
 function fillOptionsFor(flag){
@@ -258,6 +259,18 @@ const det = {
   hasVolume:  n => /\d+\s*(ml|l|리터|cc)/i.test(n),
   hasTime:    n => /\d+\s*시|\d{1,2}:\d{2}|오전|오후|런치타임|~/.test(n),
   isMarket:   s => /싯가|시가|당일시가|시세/.test(s),
+  // 구체적 품명 없이 일반 명칭만 적힌 경우 판별 (예: "음료수", "맥주", "소주", "와인", "주스")
+  // 브랜드/종류가 함께 있으면(예: "카스 맥주", "참이슬", "하이트") 통과
+  isGenericDrink: n => {
+    const x = norm(n);
+    // 일반 명칭 단독 패턴: 해당 단어로만 구성되거나 수식어 없이 쓰인 경우
+    const genericWords = ['음료수','음료','맥주','생맥주','소주','막걸리','와인','주스','에이드','하이볼','사케','청주','위스키','칵테일','커피','차','탄산음료'];
+    // 브랜드/구체 키워드가 하나라도 있으면 구체적인 것으로 간주 → 통과
+    const brandHints = /카스|테라|하이트|클라우드|켈리|오비|참이슬|처음처럼|진로|좋은데이|새로|c1|화요|일품|백세주|국순당|장수|느린마을|복순도가|코카|펩시|칠성|스프라이트|환타|델몬트|미닛메이드|아메리카노|라떼|에스프레소|카푸치노|아인슈페너|모히토|마가리타|하이네켄|아사히|삿포로|기린|칭따오|버드와이저|코로나|스텔라|기네스|호가든|산토리|발렌타인|조니워커|잭다니엘|글렌|맥캘란|샤르도네|까베르네|메를로|피노|모스카토|샴페인|프로세코/i;
+    if (brandHints.test(x)) return false;
+    // 일반 명칭이 포함되어 있고, 그 명칭이 메뉴명의 핵심인 경우 → 구체화 필요
+    return genericWords.some(w => x.includes(w));
+  },
 };
 
 function inspect(item, globalCook){
@@ -304,8 +317,11 @@ function inspect(item, globalCook){
   if(det.isMarket(n) || det.isMarket(price)) flags.push('고정 판매가 확인');
   else if(!price || norm(price)==='') flags.push('판매 가격 확인');
 
-  // E. 용량  [주류, 음료]
-  if((cat==='주류' || cat==='음료') && !det.hasVolume(n)) flags.push('용량(mL/L) 확인');
+  // E. 용량·품명  [주류, 음료] — 둘 다 필요하면 둘 다 추가됨
+  if(cat==='주류' || cat==='음료'){
+    if(!det.hasVolume(n)) flags.push('용량(mL/L) 확인');
+    if(det.isGenericDrink(n)) flags.push('구체적 품명 확인');
+  }
 
   // F. 점심·특선  [메뉴명 패턴, 카테고리 무관]
   if(/점심|특선|런치/.test(nn) && !det.hasTime(n)) flags.push('판매 시간대 확인');
