@@ -102,7 +102,11 @@ app.post("/", async (req, res) => {
           contents: [{ parts }],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 16384,
+            // maxOutputTokens 는 thinking + 실제 출력 토큰의 합산 한도다.
+            // 2.5-flash 는 thinking 이 출력 예산을 잠식하므로 한도를 크게 두고
+            // thinkingBudget 으로 사고량을 제한해 JSON 출력 공간을 확보한다.
+            maxOutputTokens: 32768,
+            thinkingConfig: { thinkingBudget: 6144 },
             responseMimeType: "application/json",
           },
         }),
@@ -126,6 +130,14 @@ app.post("/", async (req, res) => {
       .join("")
       .trim();
 
+    // 출력이 토큰 한도로 잘린 경우: JSON 이 불완전하므로 명확히 안내
+    if (cand?.finishReason === "MAX_TOKENS") {
+      console.error("MAX_TOKENS 잘림 usage=", JSON.stringify(data?.usageMetadata));
+      return res.status(502).json({
+        error: "메뉴 양이 많아 한 번에 처리할 수 있는 한도를 넘었어요. 사진을 더 적게(예: 3~4장씩) 나눠서 올려주세요.",
+      });
+    }
+
     if (!text) {
       return res.status(502).json({ error: "Gemini가 빈 응답을 반환했습니다." });
     }
@@ -136,8 +148,8 @@ app.post("/", async (req, res) => {
     try {
       menu = JSON.parse(jsonStr);
     } catch (e) {
-      console.error("JSON 파싱 실패:", jsonStr.slice(0, 500));
-      return res.status(502).json({ error: "Gemini 응답을 JSON으로 해석하지 못했습니다." });
+      console.error("JSON 파싱 실패 finishReason=", cand?.finishReason, "len=", jsonStr.length, "tail=", jsonStr.slice(-200));
+      return res.status(502).json({ error: "Gemini 응답을 JSON으로 해석하지 못했습니다. 사진을 더 적게 나눠 올려주세요." });
     }
     if (!menu || !Array.isArray(menu.groups)) {
       return res.status(502).json({ error: "Gemini 응답에 groups 배열이 없습니다." });
