@@ -108,6 +108,24 @@
   .badge.ok{margin-top:11px;}
   .badge.ok .pill{background:var(--tag-green-bg);color:var(--tag-green-fg);}
 
+  /* 디쉬그룹 헤더 (접기/펼치기) */
+  .grphead{display:flex;align-items:center;gap:8px;padding:12px 14px;margin:4px 0 10px;
+    background:var(--pill);border-radius:12px;cursor:pointer;user-select:none;}
+  .grphead .chev{font-size:12px;color:var(--gray2);transition:transform .15s;width:12px;text-align:center;}
+  .grphead .chev.closed{transform:rotate(-90deg);}
+  .grphead .gname{font-size:14.5px;font-weight:700;letter-spacing:-.2px;}
+  .grphead .gnote{font-size:12.5px;color:var(--gray);font-weight:500;}
+  .grphead .gcount{margin-left:auto;font-size:12.5px;color:var(--gray);font-weight:600;}
+
+  /* 디쉬 카드 내부: 수량/제공 + 구성 입력 */
+  .row .meta{display:flex;gap:8px;margin-top:11px;}
+  .row input.mini{flex:1;min-width:0;border:none;border-radius:8px;padding:9px 11px;background:var(--hover);
+    font-size:13.5px;color:var(--gray2);}
+  .row input.mini:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;}
+  .row input.comp{width:100%;margin-top:8px;border:none;border-radius:8px;padding:9px 11px;background:var(--hover);
+    font-size:13.5px;color:var(--gray2);}
+  .row input.comp:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;}
+
   .fill{background:var(--card);border:none;border-radius:14px;padding:16px;margin-bottom:10px;
     box-shadow:0 1px 2px rgba(15,15,15,.05),0 0 0 1px rgba(15,15,15,.04);}
   .fill .mname{font-size:16px;font-weight:600;margin-bottom:2px;}
@@ -276,6 +294,16 @@ const det = {
 function inspect(item, globalCook){
   const n = item.name, cat = item.cat, price = item.price||'';
   const nn = norm(n);
+  // 구조화 필드 (JSON 추출분) — 있으면 검수 통과 근거로 사용
+  const comps = Array.isArray(item.components) ? item.components.filter(Boolean) : [];
+  const hasComponents = comps.length > 0;
+  const amount = item.amount||'', serves = item.serves||'';
+  const hasAmount = norm(amount)!=='';
+  const hasServes = norm(serves)!=='';
+  const priceNote = item.priceNote||'';
+  // 수량 필드에 피스/개수/중량 표기가 들어왔는지
+  const amtHasP     = det.hasP(amount);
+  const amtHasCount = det.hasCount(amount);
   let flags = [];
 
   // A. 조리/비조리  [탕찜전골, 정육구이]
@@ -290,36 +318,40 @@ function inspect(item, globalCook){
     if(!pass && (hasTangJjim || /구이/.test(nn))) flags.push('조리/비조리 확인');
   }
 
-  // B. 초밥  [초밥]
+  // B. 초밥  [초밥] — amount(피스)·components(구성)가 채워졌으면 통과
   if(cat==='초밥'){
-    if(/모둠/.test(nn)){
-      if(!det.hasP(n)) flags.push('총 피스(P)수 확인');
-      if(!det.hasComp(n)) flags.push('구성 종류 확인');
-    } else if(!det.hasCount(n)) flags.push('제공 갯수 확인');
+    if(/모둠|모듬/.test(nn)){
+      if(!det.hasP(n) && !amtHasP) flags.push('총 피스(P)수 확인');
+      if(!det.hasComp(n) && !hasComponents) flags.push('구성 종류 확인');
+    } else if(!det.hasCount(n) && !amtHasCount){
+      flags.push('제공 갯수 확인');
+    }
   }
 
   // C. 구성·양  [해산물, 세트코스] — 모둠회처럼 둘 다 필요하면 둘 다
   if(cat==='해산물' || cat==='세트코스'){
-    // 구성이 이미 기재됨 → 패스 강화: +, 사이드모둠, 별도조리해산물, 구성설명(쉼표2개↑ / 메인·사이드 표기)
-    const compWritten = det.hasComp(n) || /메인\s*[:：]|사이드\s*[:：]/.test(n) || (n.split(/[,，]/).length>=3);
+    // 구성이 이미 기재됨 → 패스: components 채워짐 / +기호 / 메인·사이드 표기 / 쉼표 나열
+    const compWritten = hasComponents || det.hasComp(n) || /메인\s*[:：]|사이드\s*[:：]/.test(n) || (n.split(/[,，]/).length>=3);
     const fullPass = compWritten || inList(n,SIDE_MODUM) || inList(n,SEAFOOD_COOKED);
     if(!fullPass){
-      if(/모둠|스페셜|세트|코스|정식|한상/.test(nn)) flags.push('구성 종류 확인');
-      if(cat==='해산물' && !(det.hasPortion(n)||det.hasCount(n)||det.hasVolume(n)))
-        flags.push('양 기준(인분/사이즈) 확인');
+      if(/모둠|모듬|스페셜|세트|코스|정식|한상/.test(nn)) flags.push('구성 종류 확인');
     }
+    // 양 기준: 이름/amount/serves 어디에도 양 정보가 없을 때만
+    if(cat==='해산물' && !(det.hasPortion(n)||det.hasCount(n)||det.hasVolume(n)||hasAmount||hasServes))
+      flags.push('양 기준(인분/사이즈) 확인');
     // 세트에 주류 결합 → 주류 가격 분리 확인
-    if(cat==='세트코스' && /소주|맥주|막걸리|와인|하이볼|사케|청하|생맥|위스키|준마이|사케/.test(nn))
+    if(cat==='세트코스' && /소주|맥주|막걸리|와인|하이볼|사케|청하|생맥|위스키|준마이/.test(nn+comps.join('')))
       flags.push('주류 가격 분리 확인');
   }
 
-  // D. 가격  [전 카테고리]
-  if(det.isMarket(n) || det.isMarket(price)) flags.push('고정 판매가 확인');
+  // D. 가격  [전 카테고리] — priceNote(시가/한정 등)도 변동가로 인식
+  if(det.isMarket(n) || det.isMarket(price) || det.isMarket(priceNote) || /한정|변동|문의/.test(priceNote))
+    flags.push('고정 판매가 확인');
   else if(!price || norm(price)==='') flags.push('판매 가격 확인');
 
-  // E. 용량·품명  [주류, 음료] — 둘 다 필요하면 둘 다 추가됨
+  // E. 용량·품명  [주류, 음료] — amount 에 용량이 들어왔으면 통과
   if(cat==='주류' || cat==='음료'){
-    if(!det.hasVolume(n)) flags.push('용량(mL/L) 확인');
+    if(!det.hasVolume(n) && !det.hasVolume(amount)) flags.push('용량(mL/L) 확인');
     if(det.isGenericDrink(n)) flags.push('구체적 품명 확인');
   }
 
@@ -332,6 +364,35 @@ function inspect(item, globalCook){
 
 /* ===================== 상태 ===================== */
 let step = 0, items = [], globalCook = false, ocrMenuCount = 0;
+let collapsed = {};   // 디쉬그룹 접힘 상태 { 그룹명: true }
+
+// 디쉬 1개의 표준 형태 (모든 필드 기본값 보장)
+function makeItem(o){
+  return Object.assign({
+    group:'', groupNote:'', name:'', price:'', priceNote:'',
+    cat:'일반', amount:'', serves:'', components:[], answers:{}, flags:[]
+  }, o||{});
+}
+
+// 백엔드 JSON(menu.groups[].dishes[]) → 평면 items[] (그룹 정보 보존)
+function flattenMenu(menu){
+  const out=[];
+  (menu.groups||[]).forEach(g=>{
+    const gname=g.name||'', gnote=g.note||'';
+    (g.dishes||[]).forEach(d=>{
+      out.push(makeItem({
+        group:gname, groupNote:gnote,
+        name:d.name||'',
+        price:(d.price==null?'':String(d.price).replace(/[^\d]/g,'')),
+        priceNote:d.priceNote||'',
+        cat:CATEGORIES.includes(d.category)?d.category:guessCategory(d.name||''),
+        amount:d.amount||'', serves:d.serves||'',
+        components:Array.isArray(d.components)?d.components.filter(Boolean):[]
+      }));
+    });
+  });
+  return out;
+}
 
 /* ===================== OCR ===================== */
 const resizeImage = (file,maxDim=1600) => new Promise(res=>{
@@ -387,9 +448,9 @@ async function handlePhotos(files){
   }
   if(!imagesB64.length){ setStatus('⚠ 이미지를 처리하지 못했어요. 다시 시도해주세요.'); resetFileInputs(); return; }
 
-  // ── 이미지를 Claude Vision으로 직접 분석 (1번 호출) ──
+  // ── 이미지를 Gemini Vision으로 직접 분석 (1번 호출) → 구조화 JSON ──
   setStatus('<span class="spin"></span>AI가 메뉴판을 읽고 정리하는 중...');
-  let cleaned='';
+  let menu=null;
   try{
     const r = await fetch(WORKER_URL,{
       method:'POST',
@@ -401,35 +462,36 @@ async function handlePhotos(files){
       const msg = (typeof j.error === 'string') ? j.error : (j.error.message || JSON.stringify(j.error));
       setStatus('⚠ 분석 오류 [HTTP '+r.status+']: '+msg); return;
     }
-    cleaned = j.text||'';
+    menu = j.menu;
   }catch(e){ console.error(e); setStatus('⚠ 분석 실패: '+String(e)); return; }
 
-  const lines = cleaned.split('\n').map(l=>l.trim()).filter(Boolean);
-  if(!lines.length){ setStatus('⚠ 메뉴를 추출하지 못했어요. 사진을 다시 확인하거나 직접 입력해주세요.'); resetFileInputs(); return; }
-
-  // textarea 거치지 않고 바로 items 생성 → 메뉴확인 표로 직행
-  items = parseLines(lines);
-  ocrMenuCount = lines.length;   // 이미지 품질 경고용
+  if(!menu || !Array.isArray(menu.groups)){
+    setStatus('⚠ 메뉴를 추출하지 못했어요. 사진을 다시 확인하거나 직접 입력해주세요.'); resetFileInputs(); return;
+  }
+  items = flattenMenu(menu);
+  if(!items.length){ setStatus('⚠ 메뉴를 추출하지 못했어요. 사진을 다시 확인하거나 직접 입력해주세요.'); resetFileInputs(); return; }
+  collapsed = {};
+  ocrMenuCount = items.length;   // 이미지 품질 경고용
   resetFileInputs();
-  setStatus('✓ '+lines.length+'개 메뉴를 정리했어요.');
+  setStatus('✓ '+items.length+'개 메뉴를 정리했어요.');
   step = 1; render();
 }
-// 파이프(메뉴명|가격|카테고리) 또는 일반 텍스트 줄들을 items로 변환
+// 수동 입력(직접 입력 텍스트)용: 파이프(메뉴명|가격|카테고리) 또는 일반 텍스트 줄 → items
 function parseLines(lines){
   return lines.map(line=>{
     if(line.includes('|')){
       const p = line.split('|').map(s=>s.trim());
-      let name=p[0]||'', price=(p[1]||'').replace(/,/g,'').replace(/원/g,''), cat=p[2]||'';
-      if(/싯가|시가|당일시가|시세|변동|문의|당일가/.test(price)) price='';
+      let name=p[0]||'', price=(p[1]||'').replace(/,/g,'').replace(/원/g,''), cat=p[2]||'', priceNote='';
+      if(/싯가|시가|당일시가|시세|변동|문의|당일가|한정/.test(price)){priceNote=price;price='';}
       if(!CATEGORIES.includes(cat)) cat=guessCategory(name);
-      return {name,price,cat,answers:{}};
+      return makeItem({name,price,priceNote,cat});
     }
     const m=line.match(/([\d][\d,]*)\s*원?\s*$/);
-    let price='',name=line;
+    let price='',name=line,priceNote='';
     if(m){price=m[1].replace(/,/g,'');name=line.slice(0,m.index).trim();}
-    if(/싯가|시가|당일시가|시세/.test(line)) price='';
+    if(/싯가|시가|당일시가|시세/.test(line)){priceNote='시가';price='';}
     if(!name) name=line;
-    return {name,price,cat:guessCategory(name),answers:{}};
+    return makeItem({name,price,priceNote,cat:guessCategory(name)});
   });
 }
 function resetFileInputs(){
@@ -474,44 +536,75 @@ function renderRows(){
     warn.innerHTML='인식된 메뉴가 '+ocrMenuCount+'개뿐이에요. 메뉴판 화질 저하·빛번짐·글자 잘림이 있는지 확인하고, 필요하면 다시 촬영해주세요.';
     box.appendChild(warn);
   }
+  // 그룹 순서 보존하며 묶기
+  const groups=[]; const idx={};
   items.forEach((it,i)=>{
-    it.flags=inspect(it,globalCook);
-    const opts=CATEGORIES.map(c=>`<option ${c===it.cat?'selected':''}>${c}</option>`).join('');
-    const badge=it.flags.length
-      ?`<div class="badge">${it.flags.map(f=>`<span class="pill">${f}</span>`).join('')}</div>`
-      :`<div class="badge ok"><span class="pill">✓ 추가 확인 필요 없음</span></div>`;
-    const el=document.createElement('div');el.className='row';
-    el.innerHTML=`
-      <div class="line">
-        <input class="name" value="${esc(it.name)}" oninput="upd(${i},'name',this.value)" placeholder="메뉴명">
-        <input class="price" value="${it.price?Number(it.price).toLocaleString():''}" oninput="upd(${i},'price',this.value)" placeholder="가격" inputmode="numeric">
-      </div>
-      <div class="sub">${catDot(it.cat)}<select onchange="upd(${i},'cat',this.value)">${opts}</select>
-      <button class="del" onclick="delRow(${i})">✕</button></div>
-      ${badge}`;
-    box.appendChild(el);
+    const key=it.group||'';
+    if(!(key in idx)){ idx[key]=groups.length; groups.push({key, note:it.groupNote||'', list:[]}); }
+    if(!groups[idx[key]].note && it.groupNote) groups[idx[key]].note=it.groupNote;
+    groups[idx[key]].list.push(i);
+  });
+  groups.forEach(g=>{
+    if(g.key){
+      const open = !collapsed[g.key];
+      const head=document.createElement('div');
+      head.className='grphead';
+      head.innerHTML=`<span class="chev ${open?'':'closed'}">▾</span>
+        <span class="gname">${esc(g.key)}</span>
+        ${g.note?`<span class="gnote">· ${esc(g.note)}</span>`:''}
+        <span class="gcount">${g.list.length}</span>`;
+      head.onclick=()=>{ collapsed[g.key]=!collapsed[g.key]; renderRows(); };
+      box.appendChild(head);
+      if(!open) return;   // 접힘: 하위 디쉬 렌더 생략
+    }
+    g.list.forEach(i=>box.appendChild(renderDishCard(i)));
   });
 }
+function badgeHtml(flags){
+  return flags.length
+    ?`<div class="badge">${flags.map(f=>`<span class="pill">${esc(f)}</span>`).join('')}</div>`
+    :`<div class="badge ok"><span class="pill">✓ 추가 확인 필요 없음</span></div>`;
+}
+function renderDishCard(i){
+  const it=items[i];
+  it.flags=inspect(it,globalCook);
+  const opts=CATEGORIES.map(c=>`<option ${c===it.cat?'selected':''}>${c}</option>`).join('');
+  const el=document.createElement('div');el.className='row';el.setAttribute('data-i',i);
+  el.innerHTML=`
+    <div class="line">
+      <input class="name" value="${esc(it.name)}" oninput="upd(${i},'name',this.value)" placeholder="메뉴명">
+      <input class="price" value="${it.price?Number(it.price).toLocaleString():esc(it.priceNote)}" oninput="upd(${i},'price',this.value)" placeholder="가격" inputmode="numeric">
+    </div>
+    <div class="meta">
+      <input class="mini" value="${esc(it.amount)}" oninput="upd(${i},'amount',this.value)" placeholder="수량 (11P·1kg)">
+      <input class="mini" value="${esc(it.serves)}" oninput="upd(${i},'serves',this.value)" placeholder="제공 (2인기준)">
+    </div>
+    <input class="comp" value="${esc((it.components||[]).join(', '))}" oninput="updComp(${i},this.value)" placeholder="구성 (쉼표로 구분)">
+    <div class="sub">${catDot(it.cat)}<select onchange="upd(${i},'cat',this.value)">${opts}</select>
+    <button class="del" onclick="delRow(${i})">✕</button></div>
+    ${badgeHtml(it.flags)}`;
+  return el;
+}
 function upd(i,key,val){
-  if(key==='price') val=val.replace(/[^\d]/g,'');
+  if(key==='price'){ val=val.replace(/[^\d]/g,''); if(val) items[i].priceNote=''; }
   items[i][key]=val;
   // 카테고리 변경만 전체 재렌더(드롭다운은 포커스 유지됨).
-  // 이름/가격은 input에 이미 글자가 들어가 있으므로 재렌더하지 않고 badge만 갱신 → 키보드 유지
+  // 이름/가격/수량 등은 input에 이미 글자가 들어가 있으므로 재렌더 없이 badge만 갱신 → 키보드 유지
   if(key==='cat'){ renderRows(); }
   else { refreshBadge(i); }
 }
+function updComp(i,val){
+  items[i].components=val.split(',').map(s=>s.trim()).filter(Boolean);
+  refreshBadge(i);
+}
 function refreshBadge(i){
-  const rows=document.getElementById('rows').querySelectorAll('.row');
-  const el=rows[i]; if(!el) return;
+  const el=document.querySelector('.row[data-i="'+i+'"]'); if(!el) return;
   const it=items[i];
   it.flags=inspect(it,globalCook);
-  const badge=it.flags.length
-    ?`<div class="badge">${it.flags.map(f=>`<span class="pill">${f}</span>`).join('')}</div>`
-    :`<div class="badge ok"><span class="pill">✓ 추가 확인 필요 없음</span></div>`;
   const old=el.querySelector('.badge');
-  if(old){ old.outerHTML=badge; }
+  if(old){ old.outerHTML=badgeHtml(it.flags); }
 }
-function addRow(){items.push({name:'',price:'',cat:'일반',answers:{}});renderRows();}
+function addRow(){items.push(makeItem({cat:'일반'}));renderRows();}
 function delRow(i){items.splice(i,1);renderRows();}
 
 function renderFills(){
@@ -566,14 +659,31 @@ function toggleCook(i,f,val){
 }
 
 function renderOut(){
-  let menu=items.filter(it=>it.name).map(it=>{
-    let line=it.name; if(it.price) line+='  '+fmtPrice(it.price);
-    const ans=it.flags.map(f=>it.answers[f]).filter(Boolean);
-    if(ans.length) line+='  ('+ans.join(' / ')+')';
-    return line;
-  }).join('\n');
+  // 그룹 순서 보존하며 묶기
+  const groups=[]; const idx={};
+  items.filter(it=>it.name).forEach(it=>{
+    const key=it.group||'';
+    if(!(key in idx)){ idx[key]=groups.length; groups.push({key, note:it.groupNote||'', list:[]}); }
+    if(!groups[idx[key]].note && it.groupNote) groups[idx[key]].note=it.groupNote;
+    groups[idx[key]].list.push(it);
+  });
+  const menu=groups.map(g=>{
+    const head = g.key ? `【${g.key}】${g.note?' ('+g.note+')':''}\n` : '';
+    const body = g.list.map(it=>{
+      let line='· '+it.name;
+      const qty=[it.amount,it.serves].filter(Boolean).join(', ');
+      if(qty) line+=' '+qty;
+      if(it.price) line+='  '+fmtPrice(it.price);
+      else if(it.priceNote) line+='  '+it.priceNote;
+      if(it.components && it.components.length) line+='\n    구성: '+it.components.join(', ');
+      const ans=it.flags.map(f=>it.answers[f]).filter(Boolean);
+      if(ans.length) line+='\n    ('+ans.join(' / ')+')';
+      return line;
+    }).join('\n');
+    return head+body;
+  }).join('\n\n');
   document.getElementById('outMenu').textContent=menu||'메뉴가 없습니다.';
-  let ask=items.filter(it=>it.flags.length).map(it=>{
+  const ask=items.filter(it=>it.flags.length).map(it=>{
     const remain=it.flags.filter(f=>!it.answers[f]);
     return remain.length?`${it.name} : ${remain.join(' / ')}`:null;
   }).filter(Boolean).join('\n');
@@ -583,7 +693,7 @@ function renderOut(){
 /* ===================== 네비게이션 ===================== */
 const titles=[
   ['메뉴 입력','메뉴판 사진을 찍거나 텍스트를 붙여넣으세요'],
-  ['메뉴 확인','내용·가격·카테고리를 확인하고 고쳐주세요'],
+  ['메뉴 확인','그룹·구성·수량·가격을 확인하고 고쳐주세요'],
   ['확인사항 입력','사장님께 받아온 내용을 채워주세요'],
   ['최종 정리','복사해서 그대로 붙여넣으세요'],
 ];
