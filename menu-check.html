@@ -261,6 +261,56 @@ function catDot(cat){
   const c = CAT_COLOR[cat]||CAT_COLOR['일반'];
   return `<span class="catdot" style="background:${c[1]}"></span>`;
 }
+
+/* ===== S1 체크리스트 = 문제 유형 (드롭다운 표시용) ===== */
+const PASS = '이상 없음';
+const PTYPES = [
+  '01 조리/비조리','02 메뉴 구성','03 음료·주류 용량','04 메뉴판 미수취',
+  '05 메뉴 가격','06 정보 부정확','07 이미지 부족','08 이미지 동의 폼즈', PASS,
+];
+// 자동 감지 플래그(t) → S1 문제유형 (드롭다운 기본값 도출)
+const FLAG_PTYPE = {
+  '조리/비조리 확인':'01 조리/비조리',
+  '구성 정보 필요':'02 메뉴 구성','구성 종류 확인':'02 메뉴 구성','총 피스(P)수 확인':'02 메뉴 구성',
+  '제공 갯수 확인':'02 메뉴 구성','주류 가격 분리 확인':'02 메뉴 구성','양 기준(인분/사이즈) 확인':'02 메뉴 구성',
+  '맛(맵기) 단계 확인':'02 메뉴 구성','옵션 적용 메뉴 확인':'02 메뉴 구성','판매 시간대 확인':'02 메뉴 구성',
+  '용량(mL/L) 확인':'03 음료·주류 용량','구체적 품명 확인':'03 음료·주류 용량',
+  '고정 판매가 확인':'05 메뉴 가격','판매 가격 확인':'05 메뉴 가격',
+};
+// S1 문제유형 → 수동 지정 시 step2에서 물을 대표 수취 항목
+const PTYPE_FLAG = {
+  '01 조리/비조리':{t:'조리/비조리 확인',s:'must'},
+  '02 메뉴 구성':{t:'구성 정보 필요',s:'must'},
+  '03 음료·주류 용량':{t:'용량(mL/L) 확인',s:'must'},
+  '04 메뉴판 미수취':{t:'메뉴판·판매메뉴 공유 필요',s:'must'},
+  '05 메뉴 가격':{t:'고정 판매가 확인',s:'block'},
+  '06 정보 부정확':{t:'메뉴명·가격 재확인',s:'block'},
+  '07 이미지 부족':{t:'추가 이미지 수취',s:'must'},
+  '08 이미지 동의 폼즈':{t:'이미지 활용 동의(폼즈)',s:'must'},
+};
+const PTYPE_COLOR = {
+  '01 조리/비조리':['#FBE4E4','#B3403A'], '02 메뉴 구성':['#EAE4F2','#6940A5'],
+  '03 음료·주류 용량':['#E9F3E6','#4B7A3F'], '04 메뉴판 미수취':['#FAEBDD','#A8693B'],
+  '05 메뉴 가격':['#FBF3DB','#947101'], '06 정보 부정확':['#FBE4E4','#B3403A'],
+  '07 이미지 부족':['#DDEBF1','#28688F'], '08 이미지 동의 폼즈':['#DDEDEA','#3A7561'],
+  [PASS]:['#DBEDDB','#448361'],
+};
+function ptypeDot(p){
+  const c = PTYPE_COLOR[p]||PTYPE_COLOR[PASS];
+  return `<span class="catdot" style="background:${c[1]}"></span>`;
+}
+// 자동 감지된 대표 문제유형 (최고 심각도 플래그 기준), 없으면 이상 없음
+function autoPtype(item){
+  const f = inspect(item, globalCook);
+  if(!f.length) return PASS;
+  return FLAG_PTYPE[f[0].t] || '02 메뉴 구성';
+}
+// 실제 적용 플래그: 이상없음→없음 / 수동지정→그 유형만 / 미지정→자동 다중감지
+function effFlags(item){
+  if(item.ptype===PASS) return [];
+  if(item.ptype && PTYPE_FLAG[item.ptype]) return [PTYPE_FLAG[item.ptype]];
+  return inspect(item, globalCook);
+}
 const SEAFOOD_COOKED = ['간장게장','양념게장','새우장','전복장','새우찜','홍합탕','전복버터구이','오징어볶음','한치물회','전복물회','고등어구이'];
 const SIDE_MODUM = ['모둠버섯','모둠사리','모둠튀김','모둠어묵탕','모둠감자','모둠소세지','모둠소시지','모둠수육','모둠순대'];
 const NOODLE_HOE_PASS = ['물회','막국수','냉면','비빔국수'];
@@ -309,6 +359,12 @@ const det = {
   hasSpiceLevel: n => /순한|덜매운|아주매운|[1-9]\s*단계|맵기(선택|조절)|순한맛|보통맛|매운맛|중간맛/.test(n),
   // 어느 메뉴에 붙는지 모호한 옵션성 항목 (추가·사리·토핑 등)
   isOption:   n => /(^|\s|\+)(추가|사리|토핑|리필|곱빼기|곱배기|옵션)(\s|$|\))|추가\s*요금|추가\s*선택/.test(n),
+  // 생물 횟감(순수 회/사시미) — 인분수 수취 대상. 회무침·회덮밥·매운탕 등 요리물은 제외
+  isSashimi:  n => {
+    const x = norm(n);
+    return /회|사시미|활어|선어|숙성/.test(x)
+        && !/무침|덮밥|비빔|냉면|초밥|볶음|찜|구이|조림|튀김|탕|전골|매운/.test(x);
+  },
 };
 
 function inspect(item, globalCook){
@@ -366,7 +422,8 @@ function inspect(item, globalCook){
   if(cat==='해산물'){
     if(!compWritten && !inList(n,SIDE_MODUM) && !inList(n,SEAFOOD_COOKED) && /모둠|모듬|스페셜|세트|코스|정식|한상/.test(nn))
       add('구성 종류 확인','rec');
-    if(!(det.hasPortion(n)||det.hasCount(n)||det.hasVolume(n)||hasAmount||hasServes))
+    // 양(인분) 기준은 '순수 회/사시미(생물 횟감)'에 한해서만 수취. 회무침·매운탕 등 요리물 제외
+    if(det.isSashimi(n) && !(det.hasPortion(n)||det.hasCount(n)||det.hasVolume(n)||hasAmount||hasServes))
       add('양 기준(인분/사이즈) 확인','rec');
   }
 
@@ -404,7 +461,7 @@ let collapsed = {};   // 디쉬그룹 접힘 상태 { 그룹명: true }
 function makeItem(o){
   return Object.assign({
     group:'', groupNote:'', name:'', price:'', priceNote:'',
-    cat:'일반', amount:'', serves:'', components:[], answers:{}, flags:[]
+    cat:'일반', ptype:'', amount:'', serves:'', components:[], answers:{}, flags:[]
   }, o||{});
 }
 
@@ -651,8 +708,9 @@ function badgeHtml(flags){
 }
 function renderDishCard(i){
   const it=items[i];
-  it.flags=inspect(it,globalCook);
-  const opts=CATEGORIES.map(c=>`<option ${c===it.cat?'selected':''}>${c}</option>`).join('');
+  it.flags=effFlags(it);
+  const curP = it.ptype || autoPtype(it);
+  const opts=PTYPES.map(p=>`<option ${p===curP?'selected':''}>${p}</option>`).join('');
   const el=document.createElement('div');el.className='row';el.setAttribute('data-i',i);
   el.innerHTML=`
     <div class="line">
@@ -664,11 +722,12 @@ function renderDishCard(i){
       <input class="mini" value="${esc(it.serves)}" oninput="upd(${i},'serves',this.value)" placeholder="제공 (2인기준)">
     </div>
     <input class="comp" value="${esc((it.components||[]).join(', '))}" oninput="updComp(${i},this.value)" placeholder="구성 (쉼표로 구분)">
-    <div class="sub">${catDot(it.cat)}<select onchange="upd(${i},'cat',this.value)">${opts}</select>
+    <div class="sub">${ptypeDot(curP)}<select onchange="setPtype(${i},this.value)">${opts}</select>
     <button class="del" onclick="delRow(${i})">✕</button></div>
     ${badgeHtml(it.flags)}`;
   return el;
 }
+function setPtype(i,v){ items[i].ptype=v; renderRows(); }
 function upd(i,key,val){
   if(key==='price'){ val=val.replace(/[^\d]/g,''); if(val) items[i].priceNote=''; }
   items[i][key]=val;
@@ -684,7 +743,7 @@ function updComp(i,val){
 function refreshBadge(i){
   const el=document.querySelector('.row[data-i="'+i+'"]'); if(!el) return;
   const it=items[i];
-  it.flags=inspect(it,globalCook);
+  it.flags=effFlags(it);
   const old=el.querySelector('.badge');
   if(old){ old.outerHTML=badgeHtml(it.flags); }
 }
@@ -752,6 +811,7 @@ function renderOut(){
     if(!groups[idx[key]].note && it.groupNote) groups[idx[key]].note=it.groupNote;
     groups[idx[key]].list.push(it);
   });
+  items.forEach(it=>{ it.flags=effFlags(it); });
   const menu=groups.map(g=>{
     const head = g.key ? `【${g.key}】${g.note?' ('+g.note+')':''}\n` : '';
     const body = g.list.map(it=>{
@@ -803,7 +863,7 @@ function render(){
   document.getElementById('nextBtn').textContent=nextLabels[step];
   document.getElementById('backBtn').style.display=step===0?'none':'block';
   if(step===1) renderRows();
-  if(step===2){items.forEach(it=>it.flags=inspect(it,globalCook));renderFills();}
+  if(step===2){items.forEach(it=>it.flags=effFlags(it));renderFills();}
   if(step===3) renderOut();
   window.scrollTo(0,0);
 }
