@@ -1,0 +1,16 @@
+{
+  "name": "menu-check-server",
+  "version": "1.0.0",
+  "description": "Coupang Eats 메뉴 검수 - Gemini 기반 메뉴판 OCR/분류 백엔드 (Cloud Run)",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
