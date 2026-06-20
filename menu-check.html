@@ -120,14 +120,17 @@
   .grphead .gnote{font-size:12.5px;color:var(--gray);font-weight:500;}
   .grphead .gcount{margin-left:auto;font-size:12.5px;color:var(--gray);font-weight:600;}
 
-  /* 디쉬 카드 내부: 수량/제공 + 구성 입력 */
+  /* 디쉬 카드 내부: 수량/제공 + 구성 입력 — 빈 칸과 입력값을 명확히 구분 */
   .row .meta{display:flex;gap:8px;margin-top:11px;}
-  .row input.mini{flex:1;min-width:0;border:none;border-radius:8px;padding:9px 11px;background:var(--hover);
-    font-size:13.5px;color:var(--gray2);}
-  .row input.mini:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;}
-  .row input.comp{width:100%;margin-top:8px;border:none;border-radius:8px;padding:9px 11px;background:var(--hover);
-    font-size:13.5px;color:var(--gray2);}
-  .row input.comp:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;}
+  .row input.mini,.row input.comp{border:1px solid transparent;border-radius:8px;padding:8px 11px;
+    background:var(--hover);font-size:13.5px;color:var(--ink);font-weight:500;}
+  .row input.mini{flex:1;min-width:0;}
+  .row input.comp{width:100%;margin-top:8px;}
+  /* 입력 안 된 빈 칸: 점선 테두리 + 투명 배경 + 흐린 기울임 예시 → '공란'임이 한눈에 */
+  .row input.mini:placeholder-shown,.row input.comp:placeholder-shown{
+    background:transparent;border:1px dashed #D2D0CA;color:var(--gray2);font-weight:400;}
+  .row input.mini::placeholder,.row input.comp::placeholder{color:#B6B5B1;font-style:italic;}
+  .row input.mini:focus,.row input.comp:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;border-color:transparent;}
 
   .fill{background:var(--card);border:none;border-radius:14px;padding:16px;margin-bottom:10px;
     box-shadow:0 1px 2px rgba(15,15,15,.05),0 0 0 1px rgba(15,15,15,.04);}
@@ -266,7 +269,7 @@ function catDot(cat){
 const PASS = '이상 없음';
 const PTYPES = [
   '01 조리/비조리','02 메뉴 구성','03 음료·주류 용량','04 메뉴판 미수취',
-  '05 메뉴 가격','06 정보 부정확','07 이미지 부족','08 이미지 동의 폼즈', PASS,
+  '05 메뉴 가격','06 정보 부정확','07 이미지 부족', PASS,
 ];
 // 자동 감지 플래그(t) → S1 문제유형 (드롭다운 기본값 도출)
 const FLAG_PTYPE = {
@@ -286,13 +289,12 @@ const PTYPE_FLAG = {
   '05 메뉴 가격':{t:'고정 판매가 확인',s:'block'},
   '06 정보 부정확':{t:'메뉴명·가격 재확인',s:'block'},
   '07 이미지 부족':{t:'추가 이미지 수취',s:'must'},
-  '08 이미지 동의 폼즈':{t:'이미지 활용 동의(폼즈)',s:'must'},
 };
 const PTYPE_COLOR = {
   '01 조리/비조리':['#FBE4E4','#B3403A'], '02 메뉴 구성':['#EAE4F2','#6940A5'],
   '03 음료·주류 용량':['#E9F3E6','#4B7A3F'], '04 메뉴판 미수취':['#FAEBDD','#A8693B'],
   '05 메뉴 가격':['#FBF3DB','#947101'], '06 정보 부정확':['#FBE4E4','#B3403A'],
-  '07 이미지 부족':['#DDEBF1','#28688F'], '08 이미지 동의 폼즈':['#DDEDEA','#3A7561'],
+  '07 이미지 부족':['#DDEBF1','#28688F'],
   [PASS]:['#DBEDDB','#448361'],
 };
 function ptypeDot(p){
@@ -718,10 +720,10 @@ function renderDishCard(i){
       <input class="price" value="${it.price?Number(it.price).toLocaleString():esc(it.priceNote)}" oninput="upd(${i},'price',this.value)" placeholder="가격" inputmode="numeric">
     </div>
     <div class="meta">
-      <input class="mini" value="${esc(it.amount)}" oninput="upd(${i},'amount',this.value)" placeholder="수량 (11P·1kg)">
-      <input class="mini" value="${esc(it.serves)}" oninput="upd(${i},'serves',this.value)" placeholder="제공 (2인기준)">
+      <input class="mini" value="${esc(it.amount)}" oninput="upd(${i},'amount',this.value)" placeholder="수량 예: 11P·1kg">
+      <input class="mini" value="${esc(it.serves)}" oninput="upd(${i},'serves',this.value)" placeholder="제공 예: 2인기준">
     </div>
-    <input class="comp" value="${esc((it.components||[]).join(', '))}" oninput="updComp(${i},this.value)" placeholder="구성 (쉼표로 구분)">
+    <input class="comp" value="${esc((it.components||[]).join(', '))}" oninput="updComp(${i},this.value)" placeholder="구성 예: 활어·참치·새우 (쉼표로 구분)">
     <div class="sub">${ptypeDot(curP)}<select onchange="setPtype(${i},this.value)">${opts}</select>
     <button class="del" onclick="delRow(${i})">✕</button></div>
     ${badgeHtml(it.flags)}`;
