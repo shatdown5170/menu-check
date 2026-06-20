@@ -462,6 +462,59 @@ function visionToLines(words){
   return lines.map(l=>l.sort((a,b)=>a.x-b.x).map(w=>w.t).join(' '));
 }
 
+// ── 자동 배치 처리: 사진이 많으면 작게 나눠 여러 번 호출 후 병합 ──
+const BATCH_SIZE = 4;   // 한 번에 보낼 사진 수 (토큰 한도 안전선)
+const CONCURRENCY = 2;  // 동시 호출 수
+
+// 한 묶음(이미지 배열) 분석 → menu 반환, 실패 시 throw
+async function analyzeBatch(b64arr){
+  const r = await fetch(WORKER_URL,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ mode:'vision', images:b64arr, mediaTypes:b64arr.map(()=>'image/jpeg') })
+  });
+  const j = await r.json();
+  if(j.error){
+    const msg = (typeof j.error==='string') ? j.error : (j.error.message || JSON.stringify(j.error));
+    throw new Error('[HTTP '+r.status+'] '+msg);
+  }
+  if(!j.menu || !Array.isArray(j.menu.groups)) throw new Error('메뉴를 추출하지 못했어요');
+  return j.menu;
+}
+
+// 여러 menu 결과를 그룹/디쉬 기준으로 병합 (그룹명·디쉬명 중복 제거)
+function mergeMenus(menus){
+  const order=[], map={};
+  menus.forEach(m=>{
+    (m.groups||[]).forEach(g=>{
+      const key=norm(g.name||'');
+      if(!map[key]){ map[key]={name:g.name||'', note:g.note||'', dishes:[], dseen:{}}; order.push(key); }
+      const grp=map[key];
+      if(!grp.note && g.note) grp.note=g.note;
+      (g.dishes||[]).forEach(d=>{
+        const dk=norm(d.name||'')+'|'+(d.price==null?'':d.price);
+        if(d.name && grp.dseen[dk]) return;   // 동일 메뉴 중복 스킵
+        grp.dseen[dk]=true; grp.dishes.push(d);
+      });
+    });
+  });
+  return { groups: order.map(k=>({name:map[k].name, note:map[k].note, dishes:map[k].dishes})) };
+}
+
+// 동시성 제한하여 배치 실행 → 각 배치 결과 {ok, menu|error}
+async function runBatches(batches, onProgress){
+  const results=new Array(batches.length); let done=0, idx=0;
+  async function worker(){
+    while(idx<batches.length){
+      const my=idx++;
+      try{ results[my]={ok:true, menu:await analyzeBatch(batches[my])}; }
+      catch(e){ results[my]={ok:false, error:String(e.message||e)}; }
+      onProgress(++done, batches.length);
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(CONCURRENCY,batches.length)}, worker));
+  return results;
+}
+
 async function handlePhotos(files){
   if(!files.length) return;
   if(!WORKER_URL){
@@ -482,32 +535,29 @@ async function handlePhotos(files){
   }
   if(!imagesB64.length){ setStatus('⚠ 이미지를 처리하지 못했어요. 다시 시도해주세요.'); resetFileInputs(); return; }
 
-  // ── 이미지를 Gemini Vision으로 직접 분석 (1번 호출) → 구조화 JSON ──
-  setStatus('<span class="spin"></span>AI가 메뉴판을 읽고 정리하는 중...');
-  let menu=null;
-  try{
-    const r = await fetch(WORKER_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ mode:'vision', images:imagesB64, mediaTypes:imagesB64.map(()=> 'image/jpeg') })
-    });
-    const j = await r.json();
-    if(j.error){
-      const msg = (typeof j.error === 'string') ? j.error : (j.error.message || JSON.stringify(j.error));
-      setStatus('⚠ 분석 오류 [HTTP '+r.status+']: '+msg); return;
-    }
-    menu = j.menu;
-  }catch(e){ console.error(e); setStatus('⚠ 분석 실패: '+String(e)); return; }
+  // ── 자동 배치: BATCH_SIZE 장씩 나눠 분석 후 병합 (사진 많아도 토큰 한도 회피) ──
+  const batches=[];
+  for(let i=0;i<imagesB64.length;i+=BATCH_SIZE) batches.push(imagesB64.slice(i,i+BATCH_SIZE));
+  const batchTxt = batches.length>1 ? ' (0/'+batches.length+' 묶음)' : '';
+  setStatus('<span class="spin"></span>AI가 메뉴판을 읽고 정리하는 중...'+batchTxt);
+  const results = await runBatches(batches,(done,tot)=>{
+    setStatus('<span class="spin"></span>AI가 메뉴판을 읽고 정리하는 중...'+(tot>1?' ('+done+'/'+tot+' 묶음)':''));
+  });
 
-  if(!menu || !Array.isArray(menu.groups)){
-    setStatus('⚠ 메뉴를 추출하지 못했어요. 사진을 다시 확인하거나 직접 입력해주세요.'); resetFileInputs(); return;
+  const okMenus = results.filter(r=>r.ok).map(r=>r.menu);
+  const errs = results.filter(r=>!r.ok).map(r=>r.error);
+  if(!okMenus.length){
+    setStatus('⚠ 분석 오류: '+(errs[0]||'알 수 없는 오류')); resetFileInputs(); return;
   }
-  items = flattenMenu(menu);
+
+  items = flattenMenu(mergeMenus(okMenus));
   if(!items.length){ setStatus('⚠ 메뉴를 추출하지 못했어요. 사진을 다시 확인하거나 직접 입력해주세요.'); resetFileInputs(); return; }
   collapsed = {};
   ocrMenuCount = items.length;   // 이미지 품질 경고용
   resetFileInputs();
-  setStatus('✓ '+items.length+'개 메뉴를 정리했어요.');
+  setStatus(errs.length
+    ? '✓ '+items.length+'개 메뉴 정리 (일부 '+errs.length+'묶음 실패 — 누락분은 직접 추가하세요)'
+    : '✓ '+items.length+'개 메뉴를 정리했어요.');
   step = 1; render();
 }
 // 수동 입력(직접 입력 텍스트)용: 파이프(메뉴명|가격|카테고리) 또는 일반 텍스트 줄 → items
