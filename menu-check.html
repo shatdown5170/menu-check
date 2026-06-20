@@ -240,7 +240,7 @@ const FILL_OPTIONS = [
   {match:'맵기',        options:['맵기 선택 없음(단일)','순한맛/보통맛/매운맛','1단계/2단계/3단계','직접 입력']},
   {match:'옵션 적용',   options:['직접 입력']},
   {match:'주류 가격 분리',options:['주류 가격 별도','세트가에 포함','직접 입력']},
-  {match:'고정 판매가', options:['시가(변동)','고정가 확인','직접 입력']},
+  {match:'고정 판매가', options:['가격 직접 입력']},
   {match:'판매 가격',   options:['직접 입력']},
   {match:'용량',        options:['355mL','500mL','355mL/500mL','1L','직접 입력']},
   {match:'구체적 품명', options:['직접 입력']},
@@ -771,15 +771,16 @@ function renderFills(){
       } else {
         const opts=fillOptionsFor(f.t);
         const cur=it.answers[f.t]||'';
-        // 현재 값이 드롭다운 선택지에 있으면 그걸 선택, 없으면(자유 입력값) '직접 입력' 모드
+        const customOpt = opts.find(o=>o.includes('직접 입력')) || '직접 입력';
+        // 현재 값이 드롭다운 선택지에 있으면 그걸 선택, 없으면(자유 입력값) 직접 입력 모드
         const isPreset=opts.includes(cur);
         const showCustom = (cur!=='' && !isPreset);
-        const selVal = showCustom ? '직접 입력' : cur;
+        const selVal = showCustom ? customOpt : cur;
         const optHtml=['<option value="">선택…</option>']
           .concat(opts.map(o=>`<option value="${esc(o)}" ${o===selVal?'selected':''}>${o}</option>`)).join('');
         inner+=`<div class="ask">${sevTag}${esc(f.t)}</div>
           <select class="ansSel" onchange="setAnsSel(${i},'${esc(f.t)}',this)">${optHtml}</select>
-          <input class="ans" style="margin-top:6px;${showCustom?'':'display:none'}" value="${showCustom?esc(cur):''}" placeholder="직접 입력" oninput="setAns(${i},'${esc(f.t)}',this.value)">`;
+          <input class="ans" style="margin-top:6px;${showCustom?'':'display:none'}" value="${showCustom?esc(cur):''}" placeholder="${esc(customOpt)}" oninput="setAns(${i},'${esc(f.t)}',this.value)">`;
       }
     });
     const el=document.createElement('div');el.className='fill';el.innerHTML=inner;box.appendChild(el);
@@ -789,7 +790,7 @@ function setAns(i,f,v){items[i].answers[f]=v;}
 function setAnsSel(i,f,sel){
   const v=sel.value;
   const custom=sel.parentElement.querySelector('.ans');
-  if(v==='직접 입력'){
+  if(v.includes('직접 입력')){
     if(custom){ custom.style.display=''; custom.value=''; custom.focus(); }
     items[i].answers[f]='';
   } else {
