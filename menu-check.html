@@ -150,6 +150,9 @@
   .row .frow .comp{width:auto;flex:1;margin-top:0;}
   .row .frow select{flex:1;}
   .row .frow .badge,.row .frow .badge.ok{margin-top:0;flex:1;}
+  /* 양 행 안의 조리여부: 오른쪽에 작은 라벨 + 좁은 드롭다운 */
+  .row .frow .flab-r{flex:none;width:auto;margin-left:4px;}
+  .row .frow select.cooksel{flex:none;width:96px;}
 
   .fill{background:var(--card);border:none;border-radius:14px;padding:16px;margin-bottom:10px;
     box-shadow:0 1px 2px rgba(15,15,15,.05),0 0 0 1px rgba(15,15,15,.04);}
@@ -231,6 +234,7 @@
 <div class="page" id="p3">
   <div class="out"><h3>정리된 메뉴판</h3><div id="outMenu"></div></div>
   <div class="out"><h3>세일즈 확인 요청 요약</h3><div id="outAsk"></div></div>
+  <button class="ghost" onclick="restart()">＋ 새 메뉴판 검수하기 (처음으로)</button>
 </div>
 
 <div class="footer">
@@ -408,7 +412,8 @@ function inspect(item, globalCook){
       (/볶음/.test(nn) && !hasTangJjim) ||   // 낙지볶음=패스, 닭볶음탕=트리거
       inList(n,NOODLE_HOE_PASS) ||
       inList(n,SEAFOOD_COOKED) ||
-      globalCook;
+      globalCook ||
+      !!item.cook;   // 메뉴 확인 카드에서 조리여부를 직접 고르면 통과
     if(!pass && (hasTangJjim || /구이/.test(nn))) add('조리/비조리 확인','must');
   }
 
@@ -436,7 +441,7 @@ function inspect(item, globalCook){
     if(!compWritten && !inList(n,SIDE_MODUM) && !inList(n,SEAFOOD_COOKED) && /모둠|모듬|스페셜|세트|코스|정식|한상/.test(nn))
       add('구성 종류 확인','rec');
     // 양(인분) 기준은 '순수 회/사시미(생물 횟감)'에 한해서만 수취. 회무침·매운탕 등 요리물 제외
-    if(det.isSashimi(n) && !(det.hasPortion(n)||det.hasCount(n)||det.hasVolume(n)||hasAmount||hasServes))
+    if(det.isSashimi(n) && !(det.hasPortion(n)||det.hasCount(n)||det.hasVolume(n)||hasAmount))
       add('양 기준(인분/사이즈) 확인','rec');
   }
 
@@ -475,7 +480,7 @@ let photoImages = []; // 분석에 보낸 사진 base64(원본 순서) — 크�
 function makeItem(o){
   return Object.assign({
     group:'', groupNote:'', name:'', price:'', priceNote:'',
-    cat:'일반', ptype:'', amount:'', serves:'', components:[], answers:{}, flags:[]
+    cat:'일반', ptype:'', amount:'', serves:'', cook:'', components:[], answers:{}, flags:[]
   }, o||{});
 }
 
@@ -820,12 +825,15 @@ function applyReq(el,it){
   const r=reqFields(it.flags);
   const comp=el.querySelector('input.comp'); if(comp) comp.classList.toggle('req',!!r.comp);
   const price=el.querySelector('input.price'); if(price) price.classList.toggle('req',!!r.price);
-  const minis=el.querySelectorAll('.frow input.mini');
-  if(minis[0]) minis[0].classList.toggle('req',!!r.amount);
-  if(minis[1]) minis[1].classList.toggle('req',!!r.serves);
+  const amt=el.querySelector('input.amt'); if(amt) amt.classList.toggle('req',!!r.amount);
 }
+// 조리/비조리 입력이 의미 있는 메뉴인지 (탕·찜·전골·구이류)
+function cookRelevant(it){ return it.cat==='탕찜전골' || it.cat==='정육구이'; }
+function setCook(i,v){ items[i].cook=v; renderRows(); }
 function renderDishCard(i){
   const it=items[i];
+  // 수량+제공 분리 필드를 '양' 하나로 통합 (이전 데이터 마이그레이션)
+  if(it.serves && norm(it.serves)){ it.amount=[it.amount,it.serves].filter(s=>norm(s)).join(' · '); it.serves=''; }
   it.flags=effFlags(it);
   const r=reqFields(it.flags);
   const curP = it.ptype || autoPtype(it);
@@ -838,8 +846,13 @@ function renderDishCard(i){
       <input class="price${r.price?' req':''}" value="${it.price?Number(it.price).toLocaleString():esc(it.priceNote)}" oninput="upd(${i},'price',this.value)" placeholder="가격" inputmode="numeric">
     </div>
     <div class="frow"><span class="flab">양</span>
-      <input class="mini${r.amount?' req':''}" value="${esc(it.amount)}" oninput="upd(${i},'amount',this.value)" placeholder="수량 예: 11P·1kg">
-      <input class="mini${r.serves?' req':''}" value="${esc(it.serves)}" oninput="upd(${i},'serves',this.value)" placeholder="제공 예: 2인기준">
+      <input class="mini amt${r.amount?' req':''}" value="${esc(it.amount)}" oninput="upd(${i},'amount',this.value)" placeholder="예: 11P · 1kg · 2인기준">
+      ${cookRelevant(it)?`<span class="flab flab-r">조리여부</span>
+      <select class="cooksel" onchange="setCook(${i},this.value)">
+        <option value=""${!it.cook?' selected':''}>선택</option>
+        <option${it.cook==='조리'?' selected':''}>조리</option>
+        <option${it.cook==='비조리'?' selected':''}>비조리</option>
+      </select>`:''}
     </div>
     <div class="frow"><span class="flab">구성</span>
       <input class="comp${r.comp?' req':''}" value="${esc((it.components||[]).join(', '))}" oninput="updComp(${i},this.value)" placeholder="구성 예: 활어·참치·새우 (쉼표로 구분)">
@@ -943,6 +956,7 @@ function renderOut(){
       let line='· '+it.name;
       const qty=[it.amount,it.serves].filter(Boolean).join(', ');
       if(qty) line+=' '+qty;
+      if(it.cook) line+=' ('+it.cook+')';
       if(it.price) line+='  '+fmtPrice(it.price);
       else if(it.priceNote) line+='  '+it.priceNote;
       if(it.components && it.components.length) line+='\n    구성: '+it.components.join(', ');
@@ -1000,6 +1014,13 @@ function render(){
 function copyAll(){
   const t=document.getElementById('outMenu').textContent+'\n\n[확인 요청]\n'+document.getElementById('outAsk').textContent;
   navigator.clipboard.writeText(t).then(()=>flash('복사했어요')).catch(()=>flash('복사 실패'));
+}
+// 완료 → 처음 입력 화면으로 (입력 내용 초기화)
+function restart(){
+  items=[]; globalCook=false; ocrMenuCount=0; unreadables=[]; photoImages=[]; collapsed={};
+  const raw=document.getElementById('raw'); if(raw) raw.value='';
+  const st=document.getElementById('status'); if(st){ st.className='status'; st.innerHTML=''; }
+  step=0; render();
 }
 let toastT;
 function flash(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1600);}
