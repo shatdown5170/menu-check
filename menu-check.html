@@ -141,6 +141,8 @@
   .row input.req:placeholder-shown{background:#FBE4E4;border:1px dashed #E0938E;color:#B3403A;}
   .row input.req::placeholder{color:#CB8B86;font-style:italic;}
   .row input.price.req:placeholder-shown{background:#FBE4E4;border-radius:6px;border-bottom-color:#E0938E;color:#B3403A;}
+  /* 구체적 품명 확인: 디쉬명에 값이 있어도(일반 품명) 붉게 강조해 구체화 유도 */
+  .row input.name.reqname{background:#FBE4E4;color:#B3403A;border-radius:6px;border-bottom-color:#E0938E;padding-left:8px;}
   .row input.mini:focus,.row input.comp:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;border-color:transparent;}
   /* 카드 라벨 행: 왼쪽 항목명(양/구성/검수 유형/수취 항목) + 오른쪽 입력 */
   .row .pricelab{flex:none;font-size:12.5px;font-weight:700;color:var(--gray2);margin-left:6px;}
@@ -294,7 +296,7 @@ const FLAG_PTYPE = {
   '조리/비조리 확인':'01 조리/비조리',
   '구성 정보 필요':'02 메뉴 구성','구성 종류 확인':'02 메뉴 구성','총 피스(P)수 확인':'02 메뉴 구성',
   '제공 갯수 확인':'02 메뉴 구성','주류 가격 분리 확인':'02 메뉴 구성','양 기준(인분/사이즈) 확인':'02 메뉴 구성',
-  '맛(맵기) 단계 확인':'02 메뉴 구성','옵션 적용 메뉴 확인':'02 메뉴 구성','판매 시간대 확인':'02 메뉴 구성',
+  '옵션 적용 메뉴 확인':'02 메뉴 구성','판매 시간대 확인':'02 메뉴 구성',
   '용량(mL/L) 확인':'03 음료·주류 용량','구체적 품명 확인':'03 음료·주류 용량',
   '고정 판매가 확인':'04 메뉴 가격','판매 가격 확인':'04 메뉴 가격',
 };
@@ -406,7 +408,8 @@ function inspect(item, globalCook){
 
   // A. 조리/비조리  [탕찜전골, 정육구이] — 필수확인
   if(cat==='탕찜전골' || cat==='정육구이'){
-    const hasTangJjim = /탕|전골|찜|찌개|샤브|국밥|삼계/.test(nn);
+    // 탕수육·탕수 류는 '탕'이 들어가도 튀김요리(항상 조리)이므로 제외
+    const hasTangJjim = /탕|전골|찜|찌개|샤브|국밥|삼계/.test(nn) && !/탕수/.test(nn);
     const pass =
       /조림/.test(nn) ||
       (/볶음/.test(nn) && !hasTangJjim) ||   // 낙지볶음=패스, 닭볶음탕=트리거
@@ -444,9 +447,6 @@ function inspect(item, globalCook){
     if(det.isSashimi(n) && !(det.hasPortion(n)||det.hasCount(n)||det.hasVolume(n)||hasAmount))
       add('양 기준(인분/사이즈) 확인','rec');
   }
-
-  // 맛(맵기) 단계  [전 카테고리] — 권장
-  if(det.hasSpice(n) && !det.hasSpiceLevel(n)) add('맛(맵기) 단계 확인','rec');
 
   // 옵션 매핑 모호 (추가·사리·토핑 등이 어느 메뉴에 붙는지) — 필수확인
   if(det.isOption(n)) add('옵션 적용 메뉴 확인','must');
@@ -817,6 +817,7 @@ function reqFields(flags){
     if(t.includes('구성')) r.comp=1;
     if(t.includes('피스')||t.includes('갯수')||t.includes('양')||t.includes('제공')||t.includes('용량')){ r.amount=1; r.serves=1; }
     if(t.includes('가격')) r.price=1;
+    if(t.includes('품명')) r.name=1;   // 구체적 품명 확인 → 디쉬명 강조
   });
   return r;
 }
@@ -826,9 +827,8 @@ function applyReq(el,it){
   const comp=el.querySelector('input.comp'); if(comp) comp.classList.toggle('req',!!r.comp);
   const price=el.querySelector('input.price'); if(price) price.classList.toggle('req',!!r.price);
   const amt=el.querySelector('input.amt'); if(amt) amt.classList.toggle('req',!!r.amount);
+  const nm=el.querySelector('input.name'); if(nm) nm.classList.toggle('reqname',!!r.name);
 }
-// 조리/비조리 입력이 의미 있는 메뉴인지 (탕·찜·전골·구이류)
-function cookRelevant(it){ return it.cat==='탕찜전골' || it.cat==='정육구이'; }
 function setCook(i,v){ items[i].cook=v; renderRows(); }
 function renderDishCard(i){
   const it=items[i];
@@ -841,18 +841,19 @@ function renderDishCard(i){
   const el=document.createElement('div');el.className='row';el.setAttribute('data-i',i);
   el.innerHTML=`
     <div class="line">
-      <input class="name" value="${esc(it.name)}" oninput="upd(${i},'name',this.value)" placeholder="메뉴명">
+      <input class="name${r.name?' reqname':''}" value="${esc(it.name)}" oninput="upd(${i},'name',this.value)" placeholder="메뉴명">
       <span class="pricelab">가격</span>
       <input class="price${r.price?' req':''}" value="${it.price?Number(it.price).toLocaleString():esc(it.priceNote)}" oninput="upd(${i},'price',this.value)" placeholder="가격" inputmode="numeric">
     </div>
     <div class="frow"><span class="flab">양</span>
       <input class="mini amt${r.amount?' req':''}" value="${esc(it.amount)}" oninput="upd(${i},'amount',this.value)" placeholder="예: 11P · 1kg · 2인기준">
-      ${cookRelevant(it)?`<span class="flab flab-r">조리여부</span>
+      <span class="flab flab-r">조리여부</span>
       <select class="cooksel" onchange="setCook(${i},this.value)">
         <option value=""${!it.cook?' selected':''}>선택</option>
         <option${it.cook==='조리'?' selected':''}>조리</option>
         <option${it.cook==='비조리'?' selected':''}>비조리</option>
-      </select>`:''}
+        <option${it.cook==='모두'?' selected':''}>모두</option>
+      </select>
     </div>
     <div class="frow"><span class="flab">구성</span>
       <input class="comp${r.comp?' req':''}" value="${esc((it.components||[]).join(', '))}" oninput="updComp(${i},this.value)" placeholder="구성 예: 활어·참치·새우 (쉼표로 구분)">
