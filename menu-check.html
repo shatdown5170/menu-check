@@ -138,6 +138,14 @@
     background:transparent;border:1px dashed #D2D0CA;color:var(--gray2);font-weight:400;}
   .row input.mini::placeholder,.row input.comp::placeholder{color:#B6B5B1;font-style:italic;}
   .row input.mini:focus,.row input.comp:focus{box-shadow:0 0 0 2px var(--blue);background:#fff;border-color:transparent;}
+  /* 카드 라벨 행: 왼쪽 항목명(양/구성/검수 유형/수취 항목) + 오른쪽 입력 */
+  .row .pricelab{flex:none;font-size:12.5px;font-weight:700;color:var(--gray2);margin-left:6px;}
+  .row .frow{display:flex;align-items:center;gap:10px;margin-top:10px;}
+  .row .frow .flab{flex:none;width:62px;font-size:12.5px;font-weight:700;color:var(--gray2);}
+  .row .frow .mini{margin-top:0;}
+  .row .frow .comp{width:auto;flex:1;margin-top:0;}
+  .row .frow select{flex:1;}
+  .row .frow .badge,.row .frow .badge.ok{margin-top:0;flex:1;}
 
   .fill{background:var(--card);border:none;border-radius:14px;padding:16px;margin-bottom:10px;
     box-shadow:0 1px 2px rgba(15,15,15,.05),0 0 0 1px rgba(15,15,15,.04);}
@@ -746,7 +754,7 @@ function unreadableBannerHtml(){
   }).join('');
   return `<div class="nrbanner">`
        + `<div class="nrhd">⚠ 판독 불가 ${unreadables.length}건 — 추측 없이 제외했어요</div>`
-       + `<div class="nrsub">아래 부분은 잘림·빛번짐 등으로 읽을 수 없어요. 그 부분만 다시 촬영해 주세요.</div>`
+       + `<div class="nrsub">잘림·빛번짐 등으로 읽을 수 없는 부분이에요. 아래에 정리된 메뉴판에서 해당 정보를 확인하고 수정해 주세요.</div>`
        + rows + `</div>`;
 }
 
@@ -801,16 +809,21 @@ function renderDishCard(i){
   el.innerHTML=`
     <div class="line">
       <input class="name" value="${esc(it.name)}" oninput="upd(${i},'name',this.value)" placeholder="메뉴명">
+      <span class="pricelab">가격</span>
       <input class="price" value="${it.price?Number(it.price).toLocaleString():esc(it.priceNote)}" oninput="upd(${i},'price',this.value)" placeholder="가격" inputmode="numeric">
     </div>
-    <div class="meta">
+    <div class="frow"><span class="flab">양</span>
       <input class="mini" value="${esc(it.amount)}" oninput="upd(${i},'amount',this.value)" placeholder="수량 예: 11P·1kg">
       <input class="mini" value="${esc(it.serves)}" oninput="upd(${i},'serves',this.value)" placeholder="제공 예: 2인기준">
     </div>
-    <input class="comp" value="${esc((it.components||[]).join(', '))}" oninput="updComp(${i},this.value)" placeholder="구성 예: 활어·참치·새우 (쉼표로 구분)">
-    <div class="sub">${ptypeDot(curP)}<select onchange="setPtype(${i},this.value)">${opts}</select>
-    <button class="del" onclick="delRow(${i})">✕</button></div>
-    ${badgeHtml(it.flags)}`;
+    <div class="frow"><span class="flab">구성</span>
+      <input class="comp" value="${esc((it.components||[]).join(', '))}" oninput="updComp(${i},this.value)" placeholder="구성 예: 활어·참치·새우 (쉼표로 구분)">
+    </div>
+    <div class="frow"><span class="flab">검수 유형</span>
+      ${ptypeDot(curP)}<select onchange="setPtype(${i},this.value)">${opts}</select>
+      <button class="del" onclick="delRow(${i})">✕</button>
+    </div>
+    <div class="frow"><span class="flab">수취 항목</span>${badgeHtml(it.flags)}</div>`;
   return el;
 }
 function setPtype(i,v){ items[i].ptype=v; renderRows(); }
