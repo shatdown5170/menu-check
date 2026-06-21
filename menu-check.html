@@ -909,6 +909,11 @@ function renderFills(){
         const cur=it.answers[f.t]||'';
         inner+=`<div class="ask">${esc(f.t)} <span class="askn">(받아온 판매 가격을 입력)</span></div>
           <input class="ans" inputmode="numeric" value="${esc(cur)}" placeholder="예: 30,000" oninput="setAns(${i},'${esc(f.t)}',this.value)">`;
+      } else if(f.t.includes('구성')){
+        // 구성도 드롭다운 없이 바로 입력
+        const cur=it.answers[f.t]||'';
+        inner+=`<div class="ask">${esc(f.t)} <span class="askn">(받아온 구성을 입력)</span></div>
+          <input class="ans" value="${esc(cur)}" placeholder="예: 광어, 우럭, 연어, 참치" oninput="setAns(${i},'${esc(f.t)}',this.value)">`;
       } else {
         const opts=fillOptionsFor(f.t);
         const cur=it.answers[f.t]||'';
