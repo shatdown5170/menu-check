@@ -904,6 +904,11 @@ function renderFills(){
             <button class="${cur.includes('조리')?'sel':''}" onclick="toggleCook(${i},'${esc(f.t)}','조리')">조리</button>
             <button class="${cur.includes('비조리')?'sel':''}" onclick="toggleCook(${i},'${esc(f.t)}','비조리')">비조리</button>
           </div>`;
+      } else if(f.t.includes('가격')){
+        // 가격은 드롭다운 없이 바로 입력
+        const cur=it.answers[f.t]||'';
+        inner+=`<div class="ask">${esc(f.t)} <span class="askn">(받아온 판매 가격을 입력)</span></div>
+          <input class="ans" inputmode="numeric" value="${esc(cur)}" placeholder="예: 30,000" oninput="setAns(${i},'${esc(f.t)}',this.value)">`;
       } else {
         const opts=fillOptionsFor(f.t);
         const cur=it.answers[f.t]||'';
@@ -925,7 +930,7 @@ function renderFills(){
 function setAns(i,f,v){items[i].answers[f]=v;}
 function setAnsSel(i,f,sel){
   const v=sel.value;
-  const custom=sel.parentElement.querySelector('.ans');
+  const custom=sel.nextElementSibling;   // 셀렉트 바로 다음 입력칸(같은 항목)만 정확히 타겟
   if(v.includes('직접 입력')){
     if(custom){ custom.style.display=''; custom.value=''; custom.focus(); }
     items[i].answers[f]='';
