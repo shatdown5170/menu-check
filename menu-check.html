@@ -76,14 +76,16 @@
   .reorder-btn{padding:8px 16px;border:none;border-radius:99px;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .15s;}
   .reorder-btn.off{background:var(--pill);color:var(--gray2);}
   .reorder-btn.on{background:var(--ink);color:#fff;}
-  .drag-handle{width:40px;min-height:60px;display:flex;align-items:center;justify-content:center;
-    font-size:22px;color:var(--gray);cursor:grab;flex:none;touch-action:none;align-self:stretch;}
+  .drag-handle{width:40px;display:flex;align-items:center;justify-content:center;
+    font-size:22px;color:var(--gray);cursor:grab;flex:none;touch-action:none;}
   .drag-handle:active{cursor:grabbing;}
-  .row.dragging{opacity:.35;pointer-events:none;}
-  .drag-placeholder{background:var(--blue-soft);border:2px dashed var(--blue);border-radius:14px;margin-bottom:10px;height:60px;}
-  .row.reorder-row{display:flex;align-items:flex-start;}
-  .row.reorder-row .row-body{flex:1;min-width:0;}
-  .row.reorder-row input,.row.reorder-row select{pointer-events:none;opacity:.6;}
+  .row.reorder-compact{display:flex;align-items:center;padding:12px 14px;gap:10px;}
+  .row.reorder-compact .drag-handle{height:auto;}
+  .compact-info{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;}
+  .compact-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+  .compact-price{font-size:13px;color:var(--gray2);flex-shrink:0;white-space:nowrap;}
+  .row.drag-ghost{position:fixed;left:0;top:0;pointer-events:none;z-index:500;opacity:.92;
+    box-shadow:0 8px 24px rgba(0,0,0,.22);margin:0;}
   .save-order-btn{display:none;width:100%;margin-top:10px;margin-bottom:2px;padding:14px;
     border:none;border-radius:12px;background:var(--blue);color:#fff;font-size:15px;font-weight:700;cursor:pointer;}
   .save-order-btn.show{display:block;}
@@ -527,7 +529,7 @@ let collapsed = {};   // 디쉬그룹 접힘 상태 { 그룹명: true }
 let reorderMode = false; // 순서변경 모드
 let unreadables = []; // 판독 불가 영역 [{photo, where, reason, crop|thumb}]
 let photoImages = []; // 분석에 보낸 사진 base64(원본 순서) — 크롭용
-let _dragSrc=null, _dragSrcIdx=-1, _plh=null;
+let _dragSrc=null, _dragSrcIdx=-1, _ghostEl=null, _ghostOffY=0, _dropPos=-1;
 
 // 디쉬 1개의 표준 형태 (모든 필드 기본값 보장)
 function makeItem(o){
@@ -950,9 +952,22 @@ function renderDishCard(i){
   const curP = it.ptype || autoPtype(it);
   const opts=PTYPES.map(p=>`<option ${p===curP?'selected':''}>${p}</option>`).join('');
   const el=document.createElement('div');
-  el.className='row'+(reorderMode?' reorder-row':'');
   el.setAttribute('data-i',i);
-  const contentHtml=`
+  if(reorderMode){
+    el.className='row reorder-compact';
+    const priceDisp=it.price?Number(it.price).toLocaleString()+'원':(it.priceNote||'');
+    const handle=document.createElement('div');
+    handle.className='drag-handle';
+    handle.textContent='⠿';
+    handle.addEventListener('pointerdown',e=>onHandleDown(e,el,i));
+    const info=document.createElement('div');
+    info.className='compact-info';
+    info.innerHTML=`<span class="compact-name">${esc(it.name)||'<em style="color:var(--gray)">이름 없음</em>'}</span>${priceDisp?`<span class="compact-price">${priceDisp}</span>`:''}`;
+    el.appendChild(handle);
+    el.appendChild(info);
+  } else {
+    el.className='row';
+    el.innerHTML=`
     <div class="line">
       <input class="name${r.name?' reqname':''}" value="${esc(it.name)}" oninput="upd(${i},'name',this.value)" placeholder="메뉴명">
       <span class="pricelab">가격</span>
@@ -976,18 +991,6 @@ function renderDishCard(i){
       <button class="del" onclick="delRow(${i})">✕</button>
     </div>
     <div class="frow"><span class="flab">수취 항목</span>${badgeHtml(it.flags)}</div>`;
-  if(reorderMode){
-    const handle=document.createElement('div');
-    handle.className='drag-handle';
-    handle.textContent='⠿';
-    handle.addEventListener('pointerdown',e=>onHandleDown(e,el,i));
-    el.appendChild(handle);
-    const body=document.createElement('div');
-    body.className='row-body';
-    body.innerHTML=contentHtml;
-    el.appendChild(body);
-  } else {
-    el.innerHTML=contentHtml;
   }
   return el;
 }
@@ -996,37 +999,60 @@ function toggleReorder(){ reorderMode=!reorderMode; renderRows(); }
 function saveOrder(){ reorderMode=false; renderRows(); }
 function onHandleDown(e,rowEl,idx){
   e.preventDefault();
-  _dragSrc=rowEl; _dragSrcIdx=idx;
-  rowEl.classList.add('dragging');
-  _plh=document.createElement('div');
-  _plh.className='drag-placeholder';
-  _plh.style.height=rowEl.offsetHeight+'px';
-  rowEl.after(_plh);
+  _dragSrc=rowEl; _dragSrcIdx=idx; _dropPos=idx;
+  const rc=rowEl.getBoundingClientRect();
+  _ghostEl=rowEl.cloneNode(true);
+  _ghostEl.classList.add('drag-ghost');
+  _ghostEl.style.width=rc.width+'px';
+  _ghostEl.style.top=rc.top+'px';
+  _ghostEl.style.left=rc.left+'px';
+  document.body.appendChild(_ghostEl);
+  _ghostOffY=e.clientY-rc.top;
+  rowEl.style.opacity='0';
+  document.querySelectorAll('#rows .row[data-i]').forEach(r=>{
+    if(r!==rowEl) r.style.transition='transform 0.15s ease';
+  });
   document.addEventListener('pointermove',onDragMove,{passive:false});
   document.addEventListener('pointerup',onDragEnd,{once:true});
 }
+function _findDropPos(cursorY){
+  const rows=[...document.querySelectorAll('#rows .row[data-i]')];
+  for(const r of rows){
+    if(r===_dragSrc) continue;
+    const rc=r.getBoundingClientRect();
+    if(cursorY<rc.top+rc.height/2) return Number(r.dataset.i);
+  }
+  return items.length;
+}
+function _applyShifts(){
+  const h=(_dragSrc.offsetHeight||52)+10;
+  document.querySelectorAll('#rows .row[data-i]').forEach(r=>{
+    if(r===_dragSrc) return;
+    const ri=Number(r.dataset.i);
+    let shift=0;
+    if(_dragSrcIdx<_dropPos && ri>_dragSrcIdx && ri<_dropPos) shift=-h;
+    else if(_dragSrcIdx>_dropPos && ri>=_dropPos && ri<_dragSrcIdx) shift=h;
+    r.style.transform=shift?`translateY(${shift}px)`:'';
+  });
+}
 function onDragMove(e){
   e.preventDefault();
-  const rows=[...document.querySelectorAll('#rows .row:not(.dragging)')];
-  const over=rows.find(r=>{const rc=r.getBoundingClientRect();return e.clientY>=rc.top&&e.clientY<=rc.bottom;});
-  if(over){
-    const rc=over.getBoundingClientRect();
-    if(e.clientY<rc.top+rc.height/2) over.before(_plh); else over.after(_plh);
-  }
+  _ghostEl.style.top=(e.clientY-_ghostOffY)+'px';
+  const newDrop=_findDropPos(e.clientY);
+  if(newDrop!==_dropPos){ _dropPos=newDrop; _applyShifts(); }
 }
 function onDragEnd(){
   if(!_dragSrc) return;
-  const allEls=[...document.querySelectorAll('#rows .row, #rows .drag-placeholder')];
-  const newIdx=allEls.indexOf(_plh);
-  if(newIdx!==-1){
-    const realNew=newIdx>_dragSrcIdx?newIdx-1:newIdx;
-    if(realNew!==_dragSrcIdx){
-      const [it]=items.splice(_dragSrcIdx,1);
-      items.splice(realNew,0,it);
-    }
+  _ghostEl?.remove(); _ghostEl=null;
+  document.querySelectorAll('#rows .row[data-i]').forEach(r=>{
+    r.style.transition=''; r.style.transform='';
+  });
+  _dragSrc.style.opacity='';
+  if(_dropPos!==_dragSrcIdx){
+    const [it]=items.splice(_dragSrcIdx,1);
+    items.splice(_dropPos>_dragSrcIdx?_dropPos-1:_dropPos,0,it);
   }
-  _dragSrc.classList.remove('dragging');
-  _plh?.remove(); _plh=null; _dragSrc=null;
+  _dragSrc=null; _dragSrcIdx=-1; _dropPos=-1;
   document.removeEventListener('pointermove',onDragMove);
   renderRows();
 }
