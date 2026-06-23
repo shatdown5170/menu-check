@@ -71,6 +71,22 @@
   .ghost{display:block;width:100%;margin-top:12px;padding:13px;border:1px dashed #D6D4CE;
     background:transparent;color:var(--gray2);font-size:14.5px;font-weight:500;border-radius:12px;transition:background .15s;}
   .ghost:active{background:var(--hover);}
+  /* 순서변경 */
+  .reorder-toolbar{display:flex;justify-content:flex-end;margin-bottom:10px;}
+  .reorder-btn{padding:8px 16px;border:none;border-radius:99px;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .15s;}
+  .reorder-btn.off{background:var(--pill);color:var(--gray2);}
+  .reorder-btn.on{background:var(--ink);color:#fff;}
+  .drag-handle{width:40px;min-height:60px;display:flex;align-items:center;justify-content:center;
+    font-size:22px;color:var(--gray);cursor:grab;flex:none;touch-action:none;align-self:stretch;}
+  .drag-handle:active{cursor:grabbing;}
+  .row.dragging{opacity:.35;pointer-events:none;}
+  .drag-placeholder{background:var(--blue-soft);border:2px dashed var(--blue);border-radius:14px;margin-bottom:10px;height:60px;}
+  .row.reorder-row{display:flex;align-items:flex-start;}
+  .row.reorder-row .row-body{flex:1;min-width:0;}
+  .row.reorder-row input,.row.reorder-row select{pointer-events:none;opacity:.6;}
+  .save-order-btn{display:none;width:100%;margin-top:10px;margin-bottom:2px;padding:14px;
+    border:none;border-radius:12px;background:var(--blue);color:#fff;font-size:15px;font-weight:700;cursor:pointer;}
+  .save-order-btn.show{display:block;}
 
   /* PC 전용: 드래그 안내 + 드롭 중 하이라이트 (모바일에선 JS로 숨김) */
   .drophint{display:none;text-align:center;font-size:12.5px;color:var(--gray);margin:4px 2px 0;font-weight:500;}
@@ -118,7 +134,7 @@
   .nrbanner .nrhd{display:flex;align-items:center;gap:7px;font-size:14.5px;font-weight:700;color:#B3403A;}
   .nrbanner .nrsub{font-size:12.5px;color:#B3403A;opacity:.85;margin:6px 0 11px;line-height:1.55;}
   .nritem{display:flex;gap:10px;align-items:center;background:#fff;border-radius:10px;padding:8px;margin-top:7px;}
-  .nritem img,.nritem .noimg{width:90px;height:70px;flex:none;border-radius:6px;object-fit:cover;background:var(--pill);cursor:pointer;}
+  .nritem img,.nritem .noimg{width:90px;height:90px;flex:none;border-radius:6px;object-fit:contain;background:var(--line);cursor:pointer;}
   .nritem img{transition:opacity .12s;} .nritem img:active{opacity:.8;}
   .nritem .noimg{display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:18px;}
   .nritem .nrtxt b{font-size:13px;font-weight:600;display:block;}
@@ -126,8 +142,8 @@
   /* 판독 불가 이미지 팝업 */
   #imgpopup{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.78);
     align-items:center;justify-content:center;padding:24px;}
-  #imgpopup img{max-width:100%;max-height:85vh;border-radius:12px;object-fit:contain;
-    box-shadow:0 8px 32px rgba(0,0,0,.4);}
+  #imgpopup img{width:min(85vw,80vh);height:min(85vw,80vh);border-radius:12px;object-fit:contain;
+    box-shadow:0 8px 32px rgba(0,0,0,.4);background:#111;}
 
   /* 카테고리 가로 스크롤 탭 바 */
   .catbar{position:sticky;z-index:9;overflow-x:auto;white-space:nowrap;display:none;
@@ -255,6 +271,7 @@
 <!-- STEP 1 -->
 <div class="page" id="p1">
   <div id="rows"></div>
+  <button class="save-order-btn" id="saveOrderBtn" onclick="saveOrder()">순서저장 완료</button>
   <button class="ghost" onclick="addRow()">+ 메뉴 직접 추가</button>
 </div>
 
@@ -507,8 +524,10 @@ function inspect(item, globalCook){
 /* ===================== 상태 ===================== */
 let step = 0, items = [], globalCook = false, ocrMenuCount = 0;
 let collapsed = {};   // 디쉬그룹 접힘 상태 { 그룹명: true }
+let reorderMode = false; // 순서변경 모드
 let unreadables = []; // 판독 불가 영역 [{photo, where, reason, crop|thumb}]
 let photoImages = []; // 분석에 보낸 사진 base64(원본 순서) — 크롭용
+let _dragSrc=null, _dragSrcIdx=-1, _plh=null;
 
 // 디쉬 1개의 표준 형태 (모든 필드 기본값 보장)
 function makeItem(o){
@@ -848,14 +867,28 @@ function renderRows(){
   const box=document.getElementById('rows');
   if(!items.length){box.innerHTML='<div class="empty">입력된 메뉴가 없어요.<br>이전 화면에서 메뉴를 입력해주세요.</div>';return;}
   box.innerHTML='';
-  // 판독 불가 배너 (최상단)
-  if(unreadables.length) box.insertAdjacentHTML('beforeend', unreadableBannerHtml());
-  // 이미지 품질 경고 (검사 G): OCR로 들어온 메뉴가 비정상적으로 적으면 화질/잘림 의심
-  if(ocrMenuCount && ocrMenuCount < 4){
-    const warn=document.createElement('div');
-    warn.className='imgwarn';
-    warn.innerHTML='인식된 메뉴가 '+ocrMenuCount+'개뿐이에요. 메뉴판 화질 저하·빛번짐·글자 잘림이 있는지 확인하고, 필요하면 다시 촬영해주세요.';
-    box.appendChild(warn);
+  // 순서변경 툴바
+  const toolbar=document.createElement('div');
+  toolbar.className='reorder-toolbar';
+  toolbar.innerHTML=`<button class="reorder-btn ${reorderMode?'on':'off'}" onclick="toggleReorder()">${reorderMode?'취소':'순서변경'}</button>`;
+  box.appendChild(toolbar);
+  // 순서저장 버튼 표시·숨김
+  const saveBtn=document.getElementById('saveOrderBtn');
+  if(saveBtn) saveBtn.classList.toggle('show', reorderMode);
+  // reorderMode 중에는 catbar 숨김
+  if(reorderMode){
+    const cb=document.getElementById('catbar');
+    if(cb){ cb.style.display='none'; destroyCatbar(); }
+  }
+  // 판독 불가 배너 & 품질 경고 (순서변경 중엔 생략)
+  if(!reorderMode){
+    if(unreadables.length) box.insertAdjacentHTML('beforeend', unreadableBannerHtml());
+    if(ocrMenuCount && ocrMenuCount < 4){
+      const warn=document.createElement('div');
+      warn.className='imgwarn';
+      warn.innerHTML='인식된 메뉴가 '+ocrMenuCount+'개뿐이에요. 메뉴판 화질 저하·빛번짐·글자 잘림이 있는지 확인하고, 필요하면 다시 촬영해주세요.';
+      box.appendChild(warn);
+    }
   }
   // 그룹 순서 보존하며 묶기
   const groups=[]; const idx={};
@@ -866,22 +899,21 @@ function renderRows(){
     groups[idx[key]].list.push(i);
   });
   groups.forEach(g=>{
-    if(g.key){
-      const open = !collapsed[g.key];
-      const head=document.createElement('div');
-      head.className='grphead';
-      head.dataset.group=g.key;
-      head.innerHTML=`<span class="chev ${open?'':'closed'}">▾</span>
-        <span class="gname">${esc(g.key)}</span>
-        ${g.note?`<span class="gnote">· ${esc(g.note)}</span>`:''}
-        <span class="gcount">${g.list.length}</span>`;
-      head.onclick=()=>{ collapsed[g.key]=!collapsed[g.key]; renderRows(); };
-      box.appendChild(head);
-      if(!open) return;   // 접힘: 하위 디쉬 렌더 생략
-    }
+    const displayKey = g.key || '미맵핑된 디쉬';
+    const open = !collapsed[displayKey];
+    const head=document.createElement('div');
+    head.className='grphead';
+    head.dataset.group=displayKey;
+    head.innerHTML=`<span class="chev ${open?'':'closed'}">▾</span>
+      <span class="gname">${esc(displayKey)}</span>
+      ${g.note?`<span class="gnote">· ${esc(g.note)}</span>`:''}
+      <span class="gcount">${g.list.length}</span>`;
+    head.onclick=()=>{ collapsed[displayKey]=!collapsed[displayKey]; renderRows(); };
+    box.appendChild(head);
+    if(!open) return;
     g.list.forEach(i=>box.appendChild(renderDishCard(i)));
   });
-  initCatbar(groups);
+  if(!reorderMode) initCatbar(groups);
 }
 function badgeHtml(flags){
   return flags.length
@@ -917,8 +949,10 @@ function renderDishCard(i){
   const r=reqFields(it.flags);
   const curP = it.ptype || autoPtype(it);
   const opts=PTYPES.map(p=>`<option ${p===curP?'selected':''}>${p}</option>`).join('');
-  const el=document.createElement('div');el.className='row';el.setAttribute('data-i',i);
-  el.innerHTML=`
+  const el=document.createElement('div');
+  el.className='row'+(reorderMode?' reorder-row':'');
+  el.setAttribute('data-i',i);
+  const contentHtml=`
     <div class="line">
       <input class="name${r.name?' reqname':''}" value="${esc(it.name)}" oninput="upd(${i},'name',this.value)" placeholder="메뉴명">
       <span class="pricelab">가격</span>
@@ -942,9 +976,60 @@ function renderDishCard(i){
       <button class="del" onclick="delRow(${i})">✕</button>
     </div>
     <div class="frow"><span class="flab">수취 항목</span>${badgeHtml(it.flags)}</div>`;
+  if(reorderMode){
+    const handle=document.createElement('div');
+    handle.className='drag-handle';
+    handle.textContent='⠿';
+    handle.addEventListener('pointerdown',e=>onHandleDown(e,el,i));
+    el.appendChild(handle);
+    const body=document.createElement('div');
+    body.className='row-body';
+    body.innerHTML=contentHtml;
+    el.appendChild(body);
+  } else {
+    el.innerHTML=contentHtml;
+  }
   return el;
 }
 function setPtype(i,v){ items[i].ptype=v; renderRows(); }
+function toggleReorder(){ reorderMode=!reorderMode; renderRows(); }
+function saveOrder(){ reorderMode=false; renderRows(); }
+function onHandleDown(e,rowEl,idx){
+  e.preventDefault();
+  _dragSrc=rowEl; _dragSrcIdx=idx;
+  rowEl.classList.add('dragging');
+  _plh=document.createElement('div');
+  _plh.className='drag-placeholder';
+  _plh.style.height=rowEl.offsetHeight+'px';
+  rowEl.after(_plh);
+  document.addEventListener('pointermove',onDragMove,{passive:false});
+  document.addEventListener('pointerup',onDragEnd,{once:true});
+}
+function onDragMove(e){
+  e.preventDefault();
+  const rows=[...document.querySelectorAll('#rows .row:not(.dragging)')];
+  const over=rows.find(r=>{const rc=r.getBoundingClientRect();return e.clientY>=rc.top&&e.clientY<=rc.bottom;});
+  if(over){
+    const rc=over.getBoundingClientRect();
+    if(e.clientY<rc.top+rc.height/2) over.before(_plh); else over.after(_plh);
+  }
+}
+function onDragEnd(){
+  if(!_dragSrc) return;
+  const allEls=[...document.querySelectorAll('#rows .row, #rows .drag-placeholder')];
+  const newIdx=allEls.indexOf(_plh);
+  if(newIdx!==-1){
+    const realNew=newIdx>_dragSrcIdx?newIdx-1:newIdx;
+    if(realNew!==_dragSrcIdx){
+      const [it]=items.splice(_dragSrcIdx,1);
+      items.splice(realNew,0,it);
+    }
+  }
+  _dragSrc.classList.remove('dragging');
+  _plh?.remove(); _plh=null; _dragSrc=null;
+  document.removeEventListener('pointermove',onDragMove);
+  renderRows();
+}
 function upd(i,key,val){
   if(key==='price'){ val=val.replace(/[^\d]/g,''); if(val) items[i].priceNote=''; }
   items[i][key]=val;
@@ -1087,6 +1172,7 @@ function go(dir){
   render();
 }
 function render(){
+  if(step!==1) reorderMode=false;
   document.querySelectorAll('.page').forEach((p,i)=>p.classList.toggle('show',i===step));
   document.querySelectorAll('.steps .dot').forEach((d,i)=>{
     d.classList.toggle('on',i===step);
@@ -1109,6 +1195,7 @@ function copyAll(){
 // 완료 → 처음 입력 화면으로 (입력 내용 초기화)
 function restart(){
   items=[]; globalCook=false; ocrMenuCount=0; unreadables=[]; photoImages=[]; collapsed={};
+  reorderMode=false;
   const raw=document.getElementById('raw'); if(raw) raw.value='';
   const st=document.getElementById('status'); if(st){ st.className='status'; st.innerHTML=''; }
   destroyCatbar();
@@ -1137,16 +1224,16 @@ function initCatbar(groups){
   const catbar=document.getElementById('catbar');
   if(!catbar) return;
   destroyCatbar();
-  const named=groups.filter(g=>g.key);
-  if(named.length<2){ catbar.style.display='none'; return; }
+  const displayGroups=groups.map(g=>({...g,displayKey:g.key||'미맵핑된 디쉬'}));
+  if(displayGroups.length<2){ catbar.style.display='none'; return; }
 
   catbar.innerHTML='';
-  named.forEach((g,i)=>{
+  displayGroups.forEach((g,i)=>{
     const btn=document.createElement('button');
     btn.className='ctab'+(i===0?' on':'');
-    btn.textContent=g.key;
+    btn.textContent=g.displayKey;
     btn.onclick=()=>{
-      const el=document.querySelector(`.grphead[data-group="${CSS.escape(g.key)}"]`);
+      const el=document.querySelector(`.grphead[data-group="${CSS.escape(g.displayKey)}"]`);
       if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
     };
     catbar.appendChild(btn);
