@@ -32,7 +32,7 @@
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Pretendard",Roboto,"Malgun Gothic",sans-serif;
     -webkit-font-smoothing:antialiased;}
-  body{padding-bottom:120px;line-height:1.5;}
+  body{padding-bottom:120px;line-height:1.5;max-width:680px;margin:0 auto;}
 
   .top{position:sticky;top:0;z-index:10;background:rgba(247,246,243,.88);backdrop-filter:saturate(180%) blur(14px);
     padding:18px 20px 12px;}
@@ -71,6 +71,11 @@
   .ghost{display:block;width:100%;margin-top:12px;padding:13px;border:1px dashed #D6D4CE;
     background:transparent;color:var(--gray2);font-size:14.5px;font-weight:500;border-radius:12px;transition:background .15s;}
   .ghost:active{background:var(--hover);}
+
+  /* PC 전용: 드래그 안내 + 드롭 중 하이라이트 (모바일에선 JS로 숨김) */
+  .drophint{display:none;text-align:center;font-size:12.5px;color:var(--gray);margin:4px 2px 0;font-weight:500;}
+  .drophint.show{display:block;}
+  #p0.dropping{outline:2px dashed var(--blue);outline-offset:-6px;border-radius:16px;background:var(--blue-soft);}
 
   .or{text-align:center;color:var(--gray);font-size:12px;margin:20px 0 14px;position:relative;font-weight:500;letter-spacing:.3px;}
   .or::before,.or::after{content:"";position:absolute;top:50%;width:40%;height:1px;background:var(--line);}
@@ -179,7 +184,8 @@
   .out h3{margin:0 0 10px;font-size:12px;color:var(--gray);font-weight:600;letter-spacing:.3px;text-transform:none;}
   .out + .out{margin-top:12px;}
 
-  .footer{position:fixed;left:0;right:0;bottom:0;background:linear-gradient(transparent,var(--bg) 35%);
+  .footer{position:fixed;left:50%;transform:translateX(-50%);width:100%;max-width:680px;bottom:0;
+    background:linear-gradient(transparent,var(--bg) 35%);
     padding:14px 18px 22px;display:flex;gap:10px;align-items:center;}
   .btn{flex:1;border:none;border-radius:99px;padding:16px;font-size:15.5px;font-weight:600;transition:transform .12s,background .15s;}
   .btn.primary{background:var(--ink);color:#fff;box-shadow:0 4px 14px rgba(15,15,15,.18);}
@@ -217,6 +223,7 @@
     <span class="ico gal">🖼</span>사진첩에서 선택<span class="arr">›</span></button>
   <input id="fileCamera" type="file" accept="image/*" capture="environment" style="display:none" onchange="handlePhotos(this.files)">
   <input id="fileGallery" type="file" accept="image/*" multiple style="display:none" onchange="handlePhotos(this.files)">
+  <div class="drophint" id="drophint">또는 이미지를 이 영역에 끌어다 놓으세요</div>
   <div class="status" id="status"></div>
   <div class="or">또는 직접 입력</div>
   <textarea id="raw" placeholder="한 줄에 메뉴 하나씩&#10;예) 모둠초밥 25,000&#10;참치초밥 8000&#10;우럭 매운탕 35,000원"></textarea>
@@ -506,16 +513,28 @@ function flattenMenu(menu){
 
 /* ===================== OCR ===================== */
 const resizeImage = (file,maxDim=1600) => new Promise(res=>{
-  const img=new Image(), url=URL.createObjectURL(file);
+  // 브라우저가 <img>로 디코딩하지 못하는 포맷(HEIC/HEIF/TIFF)은 즉시 건너뜀 — PC HEIC 업로드 실패 방지
+  if(/image\/(heic|heif|tiff)/i.test(file.type||'') || /\.(heic|heif|tiff?)$/i.test(file.name||'')) return res(null);
+  let url;
+  try{ url=URL.createObjectURL(file); }catch(e){ return res(null); }
+  const revoke=()=>{ try{ URL.revokeObjectURL(url); }catch(_){} };
+  const img=new Image();
   img.onload=()=>{
-    let w=img.width,h=img.height;
-    if(Math.max(w,h)>maxDim){const s=maxDim/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
-    const c=document.createElement('canvas');c.width=w;c.height=h;
-    c.getContext('2d').drawImage(img,0,0,w,h);
-    URL.revokeObjectURL(url);
-    res(c.toDataURL('image/jpeg',0.85).split(',')[1]);
+    try{
+      let w=img.width,h=img.height;
+      if(!w||!h){ revoke(); return res(null); }
+      if(Math.max(w,h)>maxDim){const s=maxDim/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      const ctx=c.getContext('2d');
+      if(!ctx){ revoke(); return res(null); }
+      ctx.drawImage(img,0,0,w,h);
+      const durl=c.toDataURL('image/jpeg',0.85);
+      revoke();
+      res((durl.split(',')[1])||null);
+    }catch(e){ revoke(); res(null); }
   };
-  img.onerror=()=>res(null); img.src=url;
+  img.onerror=()=>{ revoke(); res(null); };
+  img.src=url;
 });
 
 // Vision 단어+좌표 → 줄 단위 텍스트
@@ -626,18 +645,37 @@ async function handlePhotos(files){
     return;
   }
   const fileArr = Array.from(files);
-  const total = fileArr.length;
+
+  // ── 포맷 선별: 브라우저가 못 여는 HEIC/HEIF/TIFF 분리 + 비이미지 파일 제외 ──
+  const isUnsupported = f => /image\/(heic|heif|tiff)/i.test(f.type||'') || /\.(heic|heif|tiff?)$/i.test(f.name||'');
+  const isImage = f => (f.type||'').startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/i.test(f.name||'');
+  const unsupportedFiles = fileArr.filter(isUnsupported);
+  const processable = fileArr.filter(f => isImage(f) && !isUnsupported(f));
+
+  if(!processable.length){
+    if(unsupportedFiles.length){
+      setStatus('⚠ HEIC/HEIF 사진은 브라우저에서 열 수 없어요. 아이폰 ‘설정 › 카메라 › 포맷 › 호환성 우선’으로 바꾸거나 JPG/PNG로 저장해 다시 올려주세요.');
+    } else {
+      setStatus('⚠ 이미지 파일만 올릴 수 있어요. (JPG·PNG 등)');
+    }
+    resetFileInputs(); return;
+  }
+  if(unsupportedFiles.length){
+    flash('일부 사진('+unsupportedFiles.length+'장)은 지원하지 않는 형식이라 건너뛰었어요');
+  }
+
+  const total = processable.length;
   unreadables = [];
 
   // ── 모든 이미지를 base64로 변환 (고해상도 위해 maxDim 2000) ──
   setStatus('<span class="spin"></span>사진 준비 중... (0/'+total+'장)');
   const imagesB64 = [];
-  for(let i=0;i<fileArr.length;i++){
-    const b64 = await resizeImage(fileArr[i], 2000);
+  for(let i=0;i<processable.length;i++){
+    const b64 = await resizeImage(processable[i], 2000);
     if(b64) imagesB64.push(b64);
     setStatus('<span class="spin"></span>사진 준비 중... ('+(i+1)+'/'+total+'장)');
   }
-  if(!imagesB64.length){ setStatus('⚠ 이미지를 처리하지 못했어요. 다시 시도해주세요.'); resetFileInputs(); return; }
+  if(!imagesB64.length){ setStatus('⚠ 이미지를 처리하지 못했어요. 파일이 손상되었거나 지원하지 않는 형식일 수 있어요.'); resetFileInputs(); return; }
 
   // ── 자동 배치: BATCH_SIZE 장씩 나눠 분석 후 병합 (사진 많아도 토큰 한도 회피) ──
   const batches=[];
@@ -1035,6 +1073,34 @@ function restart(){
 }
 let toastT;
 function flash(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1600);}
+
+/* ── 기기별 입력 보정 + PC 드래그앤드롭 ── */
+(function initInput(){
+  // 터치 우선 기기인지 판별 (모바일/태블릿). PC는 정밀 포인터.
+  const isTouch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  if(!isTouch){
+    // PC: '카메라로 촬영'을 파일 선택기로 동작시키고(capture 제거) 드래그 안내 노출
+    const cam=document.getElementById('fileCamera'); if(cam) cam.removeAttribute('capture');
+    const dh=document.getElementById('drophint'); if(dh) dh.classList.add('show');
+  }
+
+  // 드롭존을 빗나가 파일을 놓아도 브라우저가 그 파일을 열지 않도록 전역 차단 (작업 내용 보호)
+  ['dragover','drop'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
+
+  const zone=document.getElementById('p0');
+  if(!zone) return;
+  const isImg=f=> (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|gif|webp|bmp|heic|heif|tiff?)$/i.test(f.name||'');
+  let depth=0;  // 자식 요소 진입 시 dragleave 깜빡임 방지용 카운터
+  zone.addEventListener('dragenter',()=>{ if(step!==0) return; depth++; zone.classList.add('dropping'); });
+  zone.addEventListener('dragover', e=>{ if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; });
+  zone.addEventListener('dragleave',()=>{ if(--depth<=0){ depth=0; zone.classList.remove('dropping'); } });
+  zone.addEventListener('drop', e=>{
+    depth=0; zone.classList.remove('dropping');
+    if(step!==0) return;
+    const files=Array.from((e.dataTransfer&&e.dataTransfer.files)||[]).filter(isImg);
+    if(files.length) handlePhotos(files);
+  });
+})();
 </script>
 </body>
 </html>
