@@ -118,19 +118,38 @@
   .nrbanner .nrhd{display:flex;align-items:center;gap:7px;font-size:14.5px;font-weight:700;color:#B3403A;}
   .nrbanner .nrsub{font-size:12.5px;color:#B3403A;opacity:.85;margin:6px 0 11px;line-height:1.55;}
   .nritem{display:flex;gap:10px;align-items:center;background:#fff;border-radius:10px;padding:8px;margin-top:7px;}
-  .nritem img,.nritem .noimg{width:58px;height:46px;flex:none;border-radius:6px;object-fit:cover;background:var(--pill);}
+  .nritem img,.nritem .noimg{width:90px;height:70px;flex:none;border-radius:6px;object-fit:cover;background:var(--pill);cursor:pointer;}
+  .nritem img{transition:opacity .12s;} .nritem img:active{opacity:.8;}
   .nritem .noimg{display:flex;align-items:center;justify-content:center;color:var(--gray);font-size:18px;}
   .nritem .nrtxt b{font-size:13px;font-weight:600;display:block;}
   .nritem .nrtxt span{font-size:12px;color:var(--gray2);}
+  /* 판독 불가 이미지 팝업 */
+  #imgpopup{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.78);
+    align-items:center;justify-content:center;padding:24px;}
+  #imgpopup img{max-width:100%;max-height:85vh;border-radius:12px;object-fit:contain;
+    box-shadow:0 8px 32px rgba(0,0,0,.4);}
 
-  /* 디쉬그룹 헤더 (접기/펼치기) */
+  /* 카테고리 가로 스크롤 탭 바 */
+  .catbar{position:sticky;z-index:9;overflow-x:auto;white-space:nowrap;display:none;
+    padding:7px 22px;gap:8px;
+    background:rgba(247,246,243,.92);backdrop-filter:saturate(180%) blur(12px);
+    scrollbar-width:none;-ms-overflow-style:none;}
+  .catbar::-webkit-scrollbar{display:none;}
+  .ctab{display:inline-flex;white-space:nowrap;flex-shrink:0;
+    padding:6px 14px;border:none;border-radius:99px;
+    background:var(--pill);color:var(--gray2);
+    font-size:13px;font-weight:600;cursor:pointer;
+    transition:background .15s,color .15s;}
+  .ctab.on{background:var(--ink);color:#fff;}
+
+  /* 디쉬그룹 헤더 (접기/펼치기) — primary 버튼과 같은 진한 배경 */
   .grphead{display:flex;align-items:center;gap:8px;padding:12px 14px;margin:4px 0 10px;
-    background:var(--pill);border-radius:12px;cursor:pointer;user-select:none;}
-  .grphead .chev{font-size:20px;color:var(--ink);transition:transform .15s;width:20px;text-align:center;line-height:1;flex:none;}
+    background:var(--ink);border-radius:12px;cursor:pointer;user-select:none;}
+  .grphead .chev{font-size:20px;color:#fff;transition:transform .15s;width:20px;text-align:center;line-height:1;flex:none;}
   .grphead .chev.closed{transform:rotate(-90deg);}
-  .grphead .gname{font-size:14.5px;font-weight:700;letter-spacing:-.2px;}
-  .grphead .gnote{font-size:12.5px;color:var(--gray);font-weight:500;}
-  .grphead .gcount{margin-left:auto;font-size:12.5px;color:var(--gray);font-weight:600;}
+  .grphead .gname{font-size:14.5px;font-weight:700;letter-spacing:-.2px;color:#fff;}
+  .grphead .gnote{font-size:12.5px;color:rgba(255,255,255,.6);font-weight:500;}
+  .grphead .gcount{margin-left:auto;font-size:12.5px;color:rgba(255,255,255,.6);font-weight:600;}
 
   /* 디쉬 카드 내부: 수량/제공 + 구성 입력 — 빈 칸과 입력값을 명확히 구분 */
   .row .meta{display:flex;gap:8px;margin-top:11px;}
@@ -230,6 +249,9 @@
   <button class="ghost" onclick="loadSample()">샘플 메뉴 불러오기</button>
 </div>
 
+<!-- 카테고리 탭 바 (step 1 전용, sticky) -->
+<div id="catbar" class="catbar"></div>
+
 <!-- STEP 1 -->
 <div class="page" id="p1">
   <div id="rows"></div>
@@ -252,6 +274,11 @@
 </div>
 
 <div class="toast" id="toast">복사했어요</div>
+
+<!-- 판독 불가 이미지 팝업 -->
+<div id="imgpopup" onclick="closeImgPopup()" style="display:none">
+  <img id="popupImg" alt="판독 불가 영역 확대">
+</div>
 
 <script>
 /* ===== OCR 설정: 배포한 Cloudflare Worker 주소를 여기에 넣으세요 ===== */
@@ -561,7 +588,7 @@ function visionToLines(words){
 function isValidBbox(b){
   return Array.isArray(b) && b.length===4 && b.every(n=>!isNaN(Number(n))) && Number(b[2])>0 && Number(b[3])>0;
 }
-function cropImage(b64, bbox){
+function cropImage(b64, bbox, zoomOut=1, maxPx=300){
   return new Promise(res=>{
     const img=new Image();
     img.onload=()=>{
@@ -570,14 +597,21 @@ function cropImage(b64, bbox){
       let sy=Math.max(0,Math.min(1,Number(bbox[1])))*H;
       let sw=Math.min(1,Number(bbox[2]))*W;
       let sh=Math.min(1,Number(bbox[3]))*H;
+      if(zoomOut>1){
+        const cx=sx+sw/2, cy=sy+sh/2;
+        sw*=zoomOut; sh*=zoomOut;
+        sx=cx-sw/2; sy=cy-sh/2;
+        if(sx<0)sx=0; if(sy<0)sy=0;
+        if(sx+sw>W)sw=W-sx; if(sy+sh>H)sh=H-sy;
+      }
       if(sx+sw>W) sw=W-sx;
       if(sy+sh>H) sh=H-sy;
-      if(sw<6 || sh<6){ res(null); return; }   // 너무 작으면 폴백
-      const scale=Math.min(1, 240/sw);
+      if(sw<6 || sh<6){ res(null); return; }
+      const scale=Math.min(1, maxPx/Math.max(sw,sh));
       const c=document.createElement('canvas');
       c.width=Math.round(sw*scale); c.height=Math.round(sh*scale);
       c.getContext('2d').drawImage(img, sx,sy,sw,sh, 0,0,c.width,c.height);
-      try{ res(c.toDataURL('image/jpeg',0.82)); }catch(e){ res(null); }
+      try{ res(c.toDataURL('image/jpeg',0.85)); }catch(e){ res(null); }
     };
     img.onerror=()=>res(null);
     img.src='data:image/jpeg;base64,'+b64;
@@ -721,14 +755,17 @@ async function handlePhotos(files){
     return {photo:c.photo, where:c.where, reason:c.reason, bbox};
   });
 
-  // 판독 불가 영역: bbox 있으면 그 부분 크롭, 없으면 사진 전체 썸네일로 폴백
+  // 판독 불가 영역: bbox 있으면 그 부분 크롭(2x 줌아웃), 없으면 사진 전체 썸네일로 폴백
   unreadables = [];
   for(const u of mergedUnread){
     const b64 = photoImages[u.photo-1];
-    let crop=null;
-    if(b64 && isValidBbox(u.bbox)) crop = await cropImage(b64, u.bbox);
+    let crop=null, cropBig=null;
+    if(b64 && isValidBbox(u.bbox)){
+      crop    = await cropImage(b64, u.bbox, 2, 300);   // 기본 표시: bbox 2x 줌아웃
+      cropBig = await cropImage(b64, u.bbox, 5, 900);   // 팝업: bbox 5x 줌아웃
+    }
     unreadables.push({ photo:u.photo, where:u.where, reason:u.reason,
-      crop, thumb:(!crop && b64) ? ('data:image/jpeg;base64,'+b64) : null });
+      crop, cropBig, thumb:(!crop && b64) ? ('data:image/jpeg;base64,'+b64) : null });
   }
 
   collapsed = {};
@@ -792,12 +829,14 @@ const fmtPrice = p => p?Number(p).toLocaleString()+'원':'';
 function unreadableBannerHtml(){
   if(!unreadables.length) return '';
   const rows=unreadables.map(u=>{
-    const img = u.crop ? `<img src="${u.crop}" alt="판독 불가 영역">`
-              : u.thumb ? `<img src="${u.thumb}" alt="해당 사진">`
-              : `<div class="noimg">⚠</div>`;
+    const imgSrc = u.crop || u.thumb;
+    const bigSrc = u.cropBig || u.crop || u.thumb;
+    const img = imgSrc
+      ? `<img src="${imgSrc}" alt="판독 불가 영역" onclick="openImgPopup('${bigSrc}')">`
+      : `<div class="noimg">⚠</div>`;
     return `<div class="nritem">${img}<div class="nrtxt">`
          + `<b>사진 ${u.photo} · ${esc(u.where)||'영역 불명'}</b>`
-         + `<span>사유: ${esc(u.reason)||'판독 불가'}</span></div></div>`;
+         + `<span>사유: ${esc(u.reason)||'판독 불가'} · 탭하면 확대</span></div></div>`;
   }).join('');
   return `<div class="nrbanner">`
        + `<div class="nrhd">⚠ 판독 불가 ${unreadables.length}건 — 추측 없이 제외했어요</div>`
@@ -831,6 +870,7 @@ function renderRows(){
       const open = !collapsed[g.key];
       const head=document.createElement('div');
       head.className='grphead';
+      head.dataset.group=g.key;
       head.innerHTML=`<span class="chev ${open?'':'closed'}">▾</span>
         <span class="gname">${esc(g.key)}</span>
         ${g.note?`<span class="gnote">· ${esc(g.note)}</span>`:''}
@@ -841,6 +881,7 @@ function renderRows(){
     }
     g.list.forEach(i=>box.appendChild(renderDishCard(i)));
   });
+  initCatbar(groups);
 }
 function badgeHtml(flags){
   return flags.length
@@ -1055,6 +1096,7 @@ function render(){
   document.getElementById('subtitle').textContent=titles[step][1];
   document.getElementById('nextBtn').textContent=nextLabels[step];
   document.getElementById('backBtn').style.display=step===0?'none':'block';
+  if(step!==1){ const cb=document.getElementById('catbar'); if(cb){cb.style.display='none'; destroyCatbar();} }
   if(step===1) renderRows();
   if(step===2){items.forEach(it=>it.flags=effFlags(it));renderFills();}
   if(step===3) renderOut();
@@ -1069,10 +1111,67 @@ function restart(){
   items=[]; globalCook=false; ocrMenuCount=0; unreadables=[]; photoImages=[]; collapsed={};
   const raw=document.getElementById('raw'); if(raw) raw.value='';
   const st=document.getElementById('status'); if(st){ st.className='status'; st.innerHTML=''; }
+  destroyCatbar();
   step=0; render();
 }
 let toastT;
 function flash(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1600);}
+
+/* ── 판독 불가 이미지 팝업 ── */
+function openImgPopup(src){
+  const p=document.getElementById('imgpopup');
+  document.getElementById('popupImg').src=src;
+  p.style.display='flex';
+}
+function closeImgPopup(){
+  document.getElementById('imgpopup').style.display='none';
+  document.getElementById('popupImg').src='';
+}
+
+/* ── 카테고리 탭 바 ── */
+let _catObserver=null;
+function destroyCatbar(){
+  if(_catObserver){_catObserver.disconnect();_catObserver=null;}
+}
+function initCatbar(groups){
+  const catbar=document.getElementById('catbar');
+  if(!catbar) return;
+  destroyCatbar();
+  const named=groups.filter(g=>g.key);
+  if(named.length<2){ catbar.style.display='none'; return; }
+
+  catbar.innerHTML='';
+  named.forEach((g,i)=>{
+    const btn=document.createElement('button');
+    btn.className='ctab'+(i===0?' on':'');
+    btn.textContent=g.key;
+    btn.onclick=()=>{
+      const el=document.querySelector(`.grphead[data-group="${CSS.escape(g.key)}"]`);
+      if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+    };
+    catbar.appendChild(btn);
+  });
+
+  // .top 높이에 맞춰 sticky top 설정
+  const topEl=document.querySelector('.top');
+  catbar.style.top=(topEl?topEl.offsetHeight:0)+'px';
+  catbar.style.display='flex';
+
+  // 스크롤 스파이: grphead가 뷰포트 상단 근처 진입 시 해당 탭 활성화
+  const heads=document.querySelectorAll('.grphead[data-group]');
+  _catObserver=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting) return;
+      const key=entry.target.dataset.group;
+      catbar.querySelectorAll('.ctab').forEach(btn=>{
+        const active=btn.textContent===key;
+        btn.classList.toggle('on',active);
+        if(active) btn.scrollIntoView({inline:'nearest',block:'nearest'});
+      });
+    });
+  },{rootMargin:'-10% 0px -80% 0px',threshold:0});
+  heads.forEach(h=>_catObserver.observe(h));
+}
 
 /* ── 기기별 입력 보정 + PC 드래그앤드롭 ── */
 (function initInput(){
