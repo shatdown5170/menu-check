@@ -155,26 +155,33 @@
     </div>
 
     <div class="card">
-      <h2>운영 비용 분석</h2>
+      <h2>운영 비용 분석 <span style="font-size:10px;font-weight:400;color:#999;text-transform:none;">(일 100건 × 월 22영업일 시뮬레이션)</span></h2>
       <div class="cost-row">
         <div class="cost-box">
           <div class="num">₩4~5</div>
           <div class="unit">/ 건</div>
-          <div class="desc">API 호출 1회 기준<br>Gemini 2.5 Flash</div>
+          <div class="desc">AI API 호출 1회 기준<br>Gemini 2.5 Flash</div>
         </div>
         <div class="cost-box">
-          <div class="num">~₩1,000</div>
-          <div class="unit">/ 월 (추정)</div>
-          <div class="desc">월 수십 건 처리 기준<br>실사용량에 따라 변동</div>
+          <div class="num">2,200건</div>
+          <div class="unit">/ 월</div>
+          <div class="desc">100건 × 22영업일<br>월 처리량 기준</div>
+        </div>
+        <div class="cost-box" style="background:#EFF6FF;border-color:#BFDBFE;">
+          <div class="num" style="color:#1d4ed8;">~₩10,000</div>
+          <div class="unit">/ 월 (예상)</div>
+          <div class="desc">₩8,800~₩11,000 범위<br>연간 약 <strong>₩12만</strong></div>
         </div>
       </div>
       <table>
-        <tr><th>인프라 항목</th><th>비용</th></tr>
-        <tr><td>프론트엔드 (GitHub Pages)</td><td class="after">무료</td></tr>
-        <tr><td>백엔드 서버 (Cloud Run)</td><td class="after">무료 (사용량 내)</td></tr>
-        <tr><td>AI API (Gemini)</td><td>건당 ₩4~5</td></tr>
-        <tr><td><strong>합계 (월 50건 기준)</strong></td><td><strong>~₩250</strong></td></tr>
+        <tr><th>인프라 항목</th><th>단가</th><th>월 비용 (시뮬레이션)</th></tr>
+        <tr><td>프론트엔드 (GitHub Pages)</td><td class="after">무료</td><td class="after">₩0</td></tr>
+        <tr><td>백엔드 서버 (Cloud Run)</td><td class="after">무료 (사용량 내)</td><td class="after">₩0</td></tr>
+        <tr><td>AI API (Gemini 2.5 Flash)</td><td>건당 ₩4~5</td><td>₩8,800~₩11,000</td></tr>
+        <tr style="background:#f9f9f9;"><td><strong>합계 (월 2,200건)</strong></td><td>—</td><td><strong>₩8,800~₩11,000</strong></td></tr>
+        <tr style="background:#f9f9f9;"><td><strong>합계 (연간)</strong></td><td>—</td><td><strong>₩105,600~₩132,000</strong></td></tr>
       </table>
+      <p style="font-size:10.5px;color:#999;margin-top:6px;">※ Cloud Run은 월 200만 요청까지 무료. 실제 비용은 API 호출량에 따라 변동됩니다.</p>
     </div>
   </div>
 
