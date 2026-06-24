@@ -2,187 +2,219 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI 메뉴 검수 시스템 도입 보고서</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
-    background:#f5f4f0;color:#1a1a1a;font-size:14px;line-height:1.7;}
-  .page{max-width:820px;margin:40px auto;background:#fff;padding:52px 56px;
-    box-shadow:0 2px 20px rgba(0,0,0,.1);border-radius:4px;}
-  /* Header */
-  .doc-header{border-bottom:2px solid #1a1a1a;padding-bottom:18px;margin-bottom:32px;}
-  .doc-tag{font-size:11px;font-weight:700;letter-spacing:.12em;color:#666;text-transform:uppercase;margin-bottom:8px;}
-  h1{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.3;margin-bottom:10px;}
-  .meta{display:flex;gap:24px;font-size:12px;color:#666;}
-  .meta span b{color:#1a1a1a;}
-  /* Section */
-  section{margin-bottom:28px;}
-  h2{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
-    color:#2383E2;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #e8e7e3;}
-  p{color:#333;margin-bottom:8px;}
-  /* Flow diagram */
-  .flow{display:flex;align-items:center;gap:0;margin:14px 0;flex-wrap:wrap;}
-  .flow-box{background:#f0f4ff;border:1px solid #c5d3f5;border-radius:6px;
-    padding:10px 14px;font-size:12px;font-weight:600;text-align:center;line-height:1.4;}
-  .flow-box small{display:block;font-size:10px;font-weight:400;color:#666;margin-top:2px;}
-  .flow-arrow{color:#aaa;font-size:16px;padding:0 6px;flex-shrink:0;}
-  /* Comparison table */
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;}
-  th{background:#f5f4f0;padding:9px 12px;text-align:left;font-size:11px;
-    letter-spacing:.06em;color:#555;font-weight:700;}
-  td{padding:9px 12px;border-bottom:1px solid #eee;vertical-align:top;}
+  body{font-family:'Noto Sans KR',sans-serif;background:#f0f0f0;color:#1a1a1a;font-size:13px;line-height:1.6;}
+  .page{width:210mm;min-height:297mm;margin:20px auto;background:#fff;padding:18mm 18mm 14mm;box-shadow:0 4px 24px rgba(0,0,0,.15);}
+  .report-header{border-bottom:3px solid #1a1a2e;padding-bottom:10px;margin-bottom:16px;}
+  .report-header .label{font-size:11px;font-weight:600;color:#555;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+  .report-header h1{font-size:22px;font-weight:700;color:#1a1a2e;line-height:1.3;}
+  .report-header .meta{margin-top:6px;font-size:11px;color:#666;display:flex;gap:20px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .grid.triple{grid-template-columns:1fr 1fr 1fr;}
+  .card{border:1px solid #e0e0e0;border-radius:8px;padding:12px 14px;}
+  .card.accent{border-color:#1a1a2e;border-left:4px solid #1a1a2e;}
+  .card.blue{background:#EFF6FF;border-color:#BFDBFE;}
+  .card h2{font-size:11px;font-weight:700;color:#888;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;}
+  .card p{font-size:12.5px;color:#333;margin-bottom:4px;}
+  .flow{display:flex;align-items:center;gap:0;margin:10px 0;}
+  .flow-step{flex:1;text-align:center;padding:8px 4px;background:#F8F8F8;border-radius:6px;border:1px solid #e0e0e0;}
+  .flow-step .icon{font-size:18px;display:block;margin-bottom:2px;}
+  .flow-step .lbl{font-size:10.5px;font-weight:600;color:#1a1a2e;}
+  .flow-step .sub{font-size:9.5px;color:#777;margin-top:1px;}
+  .flow-arrow{font-size:18px;color:#aaa;flex:none;padding:0 4px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{background:#1a1a2e;color:#fff;padding:7px 10px;text-align:left;font-weight:600;font-size:11px;}
+  td{padding:7px 10px;border-bottom:1px solid #eee;vertical-align:top;}
   tr:last-child td{border-bottom:none;}
-  td:first-child{font-weight:600;width:28%;color:#444;}
-  .before{color:#c0392b;}
-  .after{color:#27ae60;font-weight:600;}
-  /* Cost cards */
-  .cost-row{display:flex;gap:16px;margin-top:10px;}
-  .cost-card{flex:1;background:#f5f4f0;border-radius:8px;padding:14px 16px;}
-  .cost-label{font-size:11px;color:#666;margin-bottom:4px;}
-  .cost-value{font-size:20px;font-weight:800;color:#1a1a1a;line-height:1;}
-  .cost-note{font-size:11px;color:#888;margin-top:4px;}
-  /* Roadmap */
-  .roadmap{display:flex;flex-direction:column;gap:10px;margin-top:10px;}
-  .rm-item{display:flex;gap:12px;align-items:flex-start;}
-  .rm-badge{background:#1a1a1a;color:#fff;border-radius:4px;font-size:10px;
-    font-weight:700;padding:3px 8px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
-  .rm-badge.soon{background:#2383E2;}
-  .rm-badge.later{background:#888;}
-  .rm-text{font-size:13px;color:#333;}
-  /* Footer */
-  .doc-footer{margin-top:32px;padding-top:16px;border-top:1px solid #e8e7e3;
-    display:flex;justify-content:space-between;font-size:11px;color:#aaa;}
-  /* Print */
+  .before{color:#b91c1c;}
+  .after{color:#15803d;font-weight:600;}
+  .cost-row{display:flex;gap:10px;margin-bottom:10px;}
+  .cost-box{flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:10px 12px;text-align:center;}
+  .cost-box .num{font-size:22px;font-weight:700;color:#1a1a2e;}
+  .cost-box .unit{font-size:11px;color:#666;}
+  .cost-box .desc{font-size:10.5px;color:#999;margin-top:2px;}
+  .roadmap{display:flex;flex-direction:column;gap:6px;}
+  .roadmap-item{display:flex;align-items:flex-start;gap:10px;}
+  .roadmap-item .phase{flex:none;width:40px;font-size:10px;font-weight:700;color:#fff;background:#1a1a2e;border-radius:4px;padding:2px 4px;text-align:center;margin-top:1px;}
+  .roadmap-item .title{font-size:12.5px;font-weight:600;color:#1a1a2e;}
+  .roadmap-item .desc{font-size:11.5px;color:#555;}
+  .footer{margin-top:14px;padding-top:10px;border-top:1px solid #e0e0e0;display:flex;justify-content:space-between;align-items:center;}
+  .footer .note{font-size:10.5px;color:#999;}
+  .badge{font-size:10px;background:#1a1a2e;color:#fff;border-radius:4px;padding:2px 8px;font-weight:600;}
   @media print{
     body{background:#fff;}
-    .page{max-width:100%;margin:0;padding:24px 28px;box-shadow:none;border-radius:0;}
-    @page{size:A4;margin:12mm 10mm;}
+    .page{margin:0;box-shadow:none;min-height:unset;}
   }
 </style>
 </head>
 <body>
 <div class="page">
 
-  <div class="doc-header">
-    <div class="doc-tag">Executive Summary</div>
+  <div class="report-header">
+    <div class="label">내부 보고서</div>
     <h1>AI 메뉴 검수 시스템 도입 보고서</h1>
     <div class="meta">
-      <span><b>보고일</b> 2026년 6월</span>
-      <span><b>작성</b> 운영팀</span>
-      <span><b>배포</b> 내부 경영진</span>
+      <span>작성일: 2026년 6월</span>
+      <span>배포: 경영진/임원</span>
+      <span>분류: 내부용</span>
     </div>
   </div>
 
-  <!-- 1. 도입 배경 -->
-  <section>
-    <h2>01 · 도입 배경 및 목적</h2>
-    <p>기존 메뉴 데이터 입력은 <b>100% 수작업</b>으로 처리되어 왔으며, 메뉴명·가격 오기입, 항목 누락, 카테고리 분류 오류 등이 반복적으로 발생하였습니다. 이를 해소하기 위해 AI 기반 OCR 자동화 도구를 도입하여 <b>초안 생성은 AI가, 최종 검수는 담당자가</b> 수행하는 하이브리드 방식으로 전환하였습니다.</p>
-  </section>
+  <div style="margin-bottom:12px;">
+    <div class="card accent">
+      <h2>도입 배경 및 목적</h2>
+      <p>기존에는 메뉴판 내용을 <strong>100% 수작업으로 입력</strong>해왔으며, 이 과정에서 오탈자·가격 오류·항목 누락 등의 리스크가 상존했습니다. 이를 해소하기 위해 AI 기반의 메뉴 자동 인식·검수 시스템을 도입하였습니다. 직원이 메뉴판 사진을 촬영해 업로드하면 AI가 초안을 자동 생성하고, 담당자가 최종 검수하는 구조로 오류를 사전에 차단합니다.</p>
+    </div>
+  </div>
 
-  <!-- 2. 시스템 구조 -->
-  <section>
-    <h2>02 · 시스템 구조</h2>
+  <div class="card" style="margin-bottom:12px;">
+    <h2>시스템 구조</h2>
     <div class="flow">
-      <div class="flow-box">메뉴판 사진<small>모바일·PC 업로드</small></div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">프론트엔드<small>GitHub Pages (HTML)</small></div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">백엔드 API<small>Cloud Run (Express)</small></div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">Gemini 2.5 Flash<small>OCR + 구조화</small></div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">검수 · 편집<small>담당자 최종 확인</small></div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-box">출력 · 복사<small>클립보드 / 내보내기</small></div>
-    </div>
-    <p style="font-size:12px;color:#888;margin-top:4px;">단일 HTML 파일 기반의 모바일 최적화 웹앱 · 별도 앱 설치 불필요 · 서버 비용 최소화(종량제)</p>
-  </section>
-
-  <!-- 3. 도입 전후 비교 -->
-  <section>
-    <h2>03 · 도입 전후 비교</h2>
-    <table>
-      <tr>
-        <th>항목</th>
-        <th>도입 전 (수작업)</th>
-        <th>도입 후 (AI 자동화)</th>
-      </tr>
-      <tr>
-        <td>입력 방식</td>
-        <td class="before">담당자 직접 타이핑</td>
-        <td class="after">AI OCR 자동 추출 → 담당자 검수</td>
-      </tr>
-      <tr>
-        <td>오류 발생</td>
-        <td class="before">오기입·누락 빈번</td>
-        <td class="after">AI 초안 + 사람 최종 확인으로 이중 검증</td>
-      </tr>
-      <tr>
-        <td>처리 속도</td>
-        <td class="before">메뉴판 1장 수분~수십 분</td>
-        <td class="after">AI 분석 10~20초 + 검수 시간</td>
-      </tr>
-      <tr>
-        <td>접근성</td>
-        <td class="before">PC 전용 / 특정 담당자 의존</td>
-        <td class="after">모바일·PC 어디서나 접속 가능</td>
-      </tr>
-      <tr>
-        <td>정량 효과</td>
-        <td colspan="2" style="color:#888;font-size:12px;">현재 도입 초기로 측정치 수집 중 — 운영 실적 누적 후 KPI 수치 보고 예정</td>
-      </tr>
-    </table>
-  </section>
-
-  <!-- 4. 운영 비용 -->
-  <section>
-    <h2>04 · 운영 비용 분석</h2>
-    <div class="cost-row">
-      <div class="cost-card">
-        <div class="cost-label">AI 분석 건당 비용</div>
-        <div class="cost-value">₩4~5</div>
-        <div class="cost-note">Gemini 2.5 Flash API (입력+출력 토큰 합산)</div>
+      <div class="flow-step">
+        <span class="icon">📸</span>
+        <div class="lbl">메뉴판 촬영</div>
+        <div class="sub">직원 스마트폰</div>
       </div>
-      <div class="cost-card">
-        <div class="cost-label">월 예상 비용 (수십 건 기준)</div>
-        <div class="cost-value">₩1,000 미만</div>
-        <div class="cost-note">호출량 비례 종량제 · 고정 서버 비용 없음</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="icon">🌐</span>
+        <div class="lbl">웹 앱 업로드</div>
+        <div class="sub">GitHub Pages</div>
       </div>
-      <div class="cost-card">
-        <div class="cost-label">인프라 비용</div>
-        <div class="cost-value">₩0</div>
-        <div class="cost-note">GitHub Pages(무료) + Cloud Run(유휴 시 비용 無)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="icon">⚡</span>
+        <div class="lbl">AI 분석 서버</div>
+        <div class="sub">Cloud Run</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="icon">🤖</span>
+        <div class="lbl">Gemini AI</div>
+        <div class="sub">OCR + 구조화</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">
+        <span class="icon">✅</span>
+        <div class="lbl">검수·편집·출력</div>
+        <div class="sub">담당자 최종 확인</div>
       </div>
     </div>
-  </section>
+    <div class="grid triple" style="margin-top:8px;">
+      <div class="card blue">
+        <h2>프론트엔드</h2>
+        <p>단일 HTML 파일<br>모바일 최적화<br>GitHub Pages 무료 호스팅</p>
+      </div>
+      <div class="card blue">
+        <h2>백엔드 서버</h2>
+        <p>Google Cloud Run<br>서울 리전 (asia-northeast3)<br>Node.js / Express</p>
+      </div>
+      <div class="card blue">
+        <h2>AI 엔진</h2>
+        <p>Google Gemini 2.5 Flash<br>이미지 OCR + 메뉴 구조화<br>다중 사진 동시 처리</p>
+      </div>
+    </div>
+  </div>
 
-  <!-- 5. 향후 발전 방향 -->
-  <section>
-    <h2>05 · 향후 발전 방향</h2>
+  <div class="grid" style="margin-bottom:12px;">
+    <div class="card">
+      <h2>도입 전후 비교</h2>
+      <table>
+        <tr><th>항목</th><th>도입 전</th><th>도입 후</th></tr>
+        <tr>
+          <td>입력 방식</td>
+          <td class="before">100% 수작업</td>
+          <td class="after">AI 초안 + 검수</td>
+        </tr>
+        <tr>
+          <td>오류 발생</td>
+          <td class="before">오탈자·누락 상존</td>
+          <td class="after">AI 전처리로 사전 감지</td>
+        </tr>
+        <tr>
+          <td>처리 속도</td>
+          <td class="before">항목별 수동 입력</td>
+          <td class="after">사진 1장 → 수초 내 초안</td>
+        </tr>
+        <tr>
+          <td>다중 사진</td>
+          <td class="before">개별 처리</td>
+          <td class="after">동시 업로드 지원</td>
+        </tr>
+        <tr>
+          <td>순서 조정</td>
+          <td class="before">재입력 필요</td>
+          <td class="after">드래그앤드롭</td>
+        </tr>
+      </table>
+      <p style="font-size:10.5px;color:#999;margin-top:6px;">※ 정량 효과(시간 절감·오류율)는 운영 후 측정 예정</p>
+    </div>
+
+    <div class="card">
+      <h2>운영 비용 분석</h2>
+      <div class="cost-row">
+        <div class="cost-box">
+          <div class="num">₩4~5</div>
+          <div class="unit">/ 건</div>
+          <div class="desc">API 호출 1회 기준<br>Gemini 2.5 Flash</div>
+        </div>
+        <div class="cost-box">
+          <div class="num">~₩1,000</div>
+          <div class="unit">/ 월 (추정)</div>
+          <div class="desc">월 수십 건 처리 기준<br>실사용량에 따라 변동</div>
+        </div>
+      </div>
+      <table>
+        <tr><th>인프라 항목</th><th>비용</th></tr>
+        <tr><td>프론트엔드 (GitHub Pages)</td><td class="after">무료</td></tr>
+        <tr><td>백엔드 서버 (Cloud Run)</td><td class="after">무료 (사용량 내)</td></tr>
+        <tr><td>AI API (Gemini)</td><td>건당 ₩4~5</td></tr>
+        <tr><td><strong>합계 (월 50건 기준)</strong></td><td><strong>~₩250</strong></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px;">
+    <h2>향후 발전 방향</h2>
     <div class="roadmap">
-      <div class="rm-item">
-        <div class="rm-badge soon">단기</div>
-        <div class="rm-text">운영 실적 데이터 수집 및 오류 감소율·처리 시간 단축 KPI 측정 체계 수립</div>
+      <div class="roadmap-item">
+        <div class="phase">단기</div>
+        <div>
+          <div class="title">정량 효과 측정</div>
+          <div class="desc">도입 전후 입력 시간·오류 건수 비교 데이터 수집 및 ROI 산출</div>
+        </div>
       </div>
-      <div class="rm-item">
-        <div class="rm-badge soon">단기</div>
-        <div class="rm-text">검수 결과 히스토리 저장 기능 추가 — 수정 이력 추적 및 감사 대응</div>
+      <div class="roadmap-item">
+        <div class="phase">중기</div>
+        <div>
+          <div class="title">외부 플랫폼 연동</div>
+          <div class="desc">네이버 플레이스·배달의민족 URL 입력 시 메뉴 자동 스크래핑·비교 기능 검토</div>
+        </div>
       </div>
-      <div class="rm-item">
-        <div class="rm-badge later">중기</div>
-        <div class="rm-text">네이버 플레이스 · 배달의민족 URL 입력만으로 메뉴 자동 동기화 기능 검토</div>
+      <div class="roadmap-item">
+        <div class="phase">중기</div>
+        <div>
+          <div class="title">다국어 지원</div>
+          <div class="desc">외국어 메뉴판 OCR 및 번역 자동화로 활용 범위 확대</div>
+        </div>
       </div>
-      <div class="rm-item">
-        <div class="rm-badge later">중기</div>
-        <div class="rm-text">다국어 메뉴판 지원 (영어·중국어·일어 OCR) 및 번역 자동화</div>
+      <div class="roadmap-item">
+        <div class="phase">장기</div>
+        <div>
+          <div class="title">메뉴 변경 이력 관리</div>
+          <div class="desc">버전 히스토리·가격 변동 추적, 플랫폼 자동 업데이트 파이프라인 구축</div>
+        </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <div class="doc-footer">
-    <span>AI 메뉴 검수 시스템 v1.0 · 내부 배포용</span>
-    <span>2026. 06</span>
+  <div class="footer">
+    <div class="note">본 시스템은 소규모 투자로 운영 효율화를 실현한 사례로, 향후 확장 가능성이 높습니다.</div>
+    <div class="badge">INTERNAL USE ONLY</div>
   </div>
 
 </div>
