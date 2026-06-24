@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 메뉴 검수 시스템 — 기능 정의서</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --navy:#0F172A; --blue:#2563EB; --blue-light:#EFF6FF;
+  --green:#15803D; --green-light:#DCFCE7;
+  --orange:#C2410C; --orange-light:#FFF7ED;
+  --purple:#7C3AED; --purple-light:#F5F3FF;
+  --teal:#0D9488; --teal-light:#F0FDFA;
+  --pink:#DB2777; --pink-light:#FDF2F8;
+  --gray:#64748B; --line:#E2E8F0; --bg:#F8FAFC;
+}
+body{font-family:'Noto Sans KR',sans-serif;background:#1E293B;color:#1a1a1a;font-size:14px;}
+
+/* ── 슬라이드 컨테이너 ── */
+.deck{display:flex;flex-direction:column;gap:0;}
+.slide{width:960px;min-height:540px;margin:32px auto;background:#fff;border-radius:16px;
+  overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.35);position:relative;}
+
+/* ── 커버 슬라이드 ── */
+.cover{background:var(--navy);color:#fff;display:flex;flex-direction:column;
+  justify-content:center;padding:64px 72px;min-height:540px;}
+.cover .tag{font-size:12px;font-weight:600;letter-spacing:.12em;color:#94A3B8;
+  text-transform:uppercase;margin-bottom:20px;}
+.cover h1{font-size:44px;font-weight:800;line-height:1.2;color:#fff;margin-bottom:16px;}
+.cover h1 span{color:#60A5FA;}
+.cover .sub{font-size:17px;color:#94A3B8;line-height:1.7;max-width:540px;}
+.cover .badges{display:flex;gap:10px;margin-top:32px;flex-wrap:wrap;}
+.cover .badge{font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;
+  background:rgba(255,255,255,.1);color:#CBD5E1;border:1px solid rgba(255,255,255,.15);}
+.cover .pg{position:absolute;bottom:28px;right:40px;font-size:12px;color:#475569;}
+
+/* ── 일반 슬라이드 헤더 ── */
+.slide-head{padding:40px 56px 0;}
+.slide-head .num{font-size:11px;font-weight:700;color:var(--blue);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:8px;}
+.slide-head h2{font-size:28px;font-weight:800;color:var(--navy);line-height:1.25;}
+.slide-head .desc{font-size:14px;color:var(--gray);margin-top:8px;line-height:1.65;}
+.slide-body{padding:28px 56px 44px;}
+
+/* ── 흐름도 슬라이드 ── */
+.flow-wrap{display:flex;align-items:stretch;gap:0;margin-top:8px;}
+.flow-node{flex:1;background:var(--blue-light);border:1.5px solid #BFDBFE;border-radius:12px;
+  padding:20px 16px;text-align:center;position:relative;}
+.flow-node .ico{font-size:28px;margin-bottom:10px;display:block;}
+.flow-node .lbl{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.flow-node .sub{font-size:11.5px;color:var(--gray);line-height:1.5;}
+.flow-node.highlight{background:#1E3A5F;border-color:#2563EB;}
+.flow-node.highlight .lbl{color:#fff;}
+.flow-node.highlight .sub{color:#93C5FD;}
+.flow-arrow{display:flex;align-items:center;padding:0 10px;flex:none;color:#94A3B8;font-size:20px;}
+
+/* ── 피처 그리드 ── */
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.feat-grid.col2{grid-template-columns:repeat(2,1fr);}
+.feat-card{border:1.5px solid var(--line);border-radius:12px;padding:20px;position:relative;
+  transition:box-shadow .15s;}
+.feat-card .fc-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;font-size:18px;margin-bottom:12px;flex:none;}
+.feat-card h3{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px;}
+.feat-card p{font-size:12.5px;color:var(--gray);line-height:1.65;}
+.feat-card ul{padding-left:14px;}
+.feat-card ul li{font-size:12.5px;color:var(--gray);margin-bottom:3px;line-height:1.6;}
+.chip{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:99px;margin-top:8px;}
+
+/* 색상 테마 */
+.t-blue .fc-icon{background:var(--blue-light);} .t-blue{border-color:#BFDBFE;}
+.t-green .fc-icon{background:var(--green-light);} .t-green{border-color:#BBF7D0;}
+.t-orange .fc-icon{background:var(--orange-light);} .t-orange{border-color:#FED7AA;}
+.t-purple .fc-icon{background:var(--purple-light);} .t-purple{border-color:#DDD6FE;}
+.t-teal .fc-icon{background:var(--teal-light);} .t-teal{border-color:#99F6E4;}
+.t-pink .fc-icon{background:var(--pink-light);} .t-pink{border-color:#FBCFE8;}
+.chip-blue{background:var(--blue-light);color:var(--blue);}
+.chip-green{background:var(--green-light);color:var(--green);}
+.chip-orange{background:var(--orange-light);color:var(--orange);}
+
+/* ── 상태 흐름표 ── */
+.flow-steps{display:flex;flex-direction:column;gap:10px;}
+.flow-step-row{display:flex;align-items:flex-start;gap:16px;}
+.step-num{width:32px;height:32px;border-radius:50%;background:var(--navy);color:#fff;
+  font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;}
+.step-body{flex:1;padding-top:4px;}
+.step-body .title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:3px;}
+.step-body .detail{font-size:12.5px;color:var(--gray);line-height:1.6;}
+.step-connector{width:32px;display:flex;justify-content:center;flex:none;margin-top:-2px;}
+.step-connector .line{width:2px;height:16px;background:var(--line);margin-top:-8px;}
+
+/* ── 비교표 ── */
+.compare{width:100%;border-collapse:collapse;font-size:13px;}
+.compare th{background:var(--navy);color:#fff;padding:10px 16px;text-align:left;font-weight:600;font-size:12px;}
+.compare td{padding:10px 16px;border-bottom:1px solid var(--line);vertical-align:top;}
+.compare tr:last-child td{border-bottom:none;}
+.compare tr:nth-child(even) td{background:#F8FAFC;}
+.bad{color:#DC2626;font-weight:500;}
+.good{color:var(--green);font-weight:600;}
+.tag-new{font-size:10px;font-weight:700;background:var(--blue);color:#fff;border-radius:4px;
+  padding:1px 6px;margin-left:6px;vertical-align:middle;}
+
+/* ── 로드맵 ── */
+.roadmap-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.rm-card{border-radius:10px;padding:16px 18px;border:1.5px solid var(--line);}
+.rm-card .phase{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.rm-card h3{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:5px;}
+.rm-card p{font-size:12px;color:var(--gray);line-height:1.6;}
+.rm-now{background:#EFF6FF;border-color:#BFDBFE;} .rm-now .phase{color:var(--blue);}
+.rm-short{background:#DCFCE7;border-color:#BBF7D0;} .rm-short .phase{color:var(--green);}
+.rm-mid{background:#FFF7ED;border-color:#FED7AA;} .rm-mid .phase{color:var(--orange);}
+.rm-long{background:#F5F3FF;border-color:#DDD6FE;} .rm-long .phase{color:var(--purple);}
+
+/* ── 페이지 번호 ── */
+.pg{position:absolute;bottom:22px;right:36px;font-size:11px;color:#94A3B8;font-weight:500;}
+.logo{position:absolute;bottom:22px;left:36px;font-size:11px;color:#94A3B8;font-weight:600;
+  letter-spacing:.05em;}
+
+/* ── 구분선 ── */
+.divider{width:48px;height:3px;background:var(--blue);border-radius:2px;margin:12px 0 20px;}
+
+@media print{
+  body{background:#fff;}
+  .slide{margin:0;border-radius:0;box-shadow:none;page-break-after:always;}
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ── SLIDE 1: 커버 ── -->
+<div class="slide cover">
+  <div class="tag">Product Feature Definition</div>
+  <h1>AI <span>메뉴 검수</span> 시스템<br>기능 정의서</h1>
+  <div class="sub">사진 한 장으로 메뉴판을 자동 인식·구조화하고<br>담당자가 실시간으로 검수·편집·출력하는 워크플로우</div>
+  <div class="badges">
+    <div class="badge">Gemini 2.5 Flash</div>
+    <div class="badge">Google Cloud Run</div>
+    <div class="badge">GitHub Pages</div>
+    <div class="badge">모바일 최적화</div>
+    <div class="badge">v1.0 · 2026.06</div>
+  </div>
+  <div class="pg">1 / 7</div>
+</div>
+
+<!-- ── SLIDE 2: 전체 흐름 ── -->
+<div class="slide">
+  <div class="slide-head">
+    <div class="num">Overview</div>
+    <h2>서비스 처리 흐름</h2>
+    <div class="desc">메뉴판 사진을 업로드하는 순간부터 최종 결과물을 출력하기까지의 전체 단계</div>
+  </div>
+  <div class="slide-body">
+    <div class="flow-wrap">
+      <div class="flow-node">
+        <span class="ico">📸</span>
+        <div class="lbl">① 업로드</div>
+        <div class="sub">카메라 촬영<br>갤러리 선택<br>PC 드래그앤드롭</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node highlight">
+        <span class="ico">🤖</span>
+        <div class="lbl">② AI 분석</div>
+        <div class="sub">Gemini 2.5 Flash<br>OCR + 구조화<br>카테고리 자동 분류</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <span class="ico">✏️</span>
+        <div class="lbl">③ 검수·편집</div>
+        <div class="sub">항목별 이름·가격·<br>설명·옵션 수정<br>순서 재배치</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <span class="ico">✅</span>
+        <div class="lbl">④ 확인</div>
+        <div class="sub">카테고리별<br>전체 항목 리뷰<br>품질 경고 표시</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <span class="ico">📋</span>
+        <div class="lbl">⑤ 출력</div>
+        <div class="sub">결과 복사<br>또는 인쇄</div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+      <div style="background:#F8FAFC;border:1px solid var(--line);border-radius:10px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">입력 유형</div>
+        <div style="font-size:13px;font-weight:600;color:var(--navy);">이미지 파일</div>
+        <div style="font-size:12px;color:var(--gray);">JPG / PNG / WEBP<br>다중 파일 동시 처리</div>
+      </div>
+      <div style="background:#F8FAFC;border:1px solid var(--line);border-radius:10px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">AI 엔진</div>
+        <div style="font-size:13px;font-weight:600;color:var(--navy);">Gemini 2.5 Flash</div>
+        <div style="font-size:12px;color:var(--gray);">멀티모달 비전<br>한국어 최적화</div>
+      </div>
+      <div style="background:#F8FAFC;border:1px solid var(--line);border-radius:10px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">플랫폼</div>
+        <div style="font-size:13px;font-weight:600;color:var(--navy);">웹 브라우저</div>
+        <div style="font-size:12px;color:var(--gray);">모바일·PC 동일 지원<br>앱 설치 불필요</div>
+      </div>
+      <div style="background:#F8FAFC;border:1px solid var(--line);border-radius:10px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">처리 시간</div>
+        <div style="font-size:13px;font-weight:600;color:var(--navy);">수 초 이내</div>
+        <div style="font-size:12px;color:var(--gray);">사진 1장 기준<br>다중 사진 병렬 처리</div>
+      </div>
+    </div>
+  </div>
+  <div class="logo">AI 메뉴 검수 시스템</div>
+  <div class="pg">2 / 7</div>
+</div>
+
+<!-- ── SLIDE 3: 핵심 기능 (입력/분석) ── -->
+<div class="slide">
+  <div class="slide-head">
+    <div class="num">Feature 01 · 02</div>
+    <h2>사진 업로드 &amp; AI 자동 분석</h2>
+    <div class="desc">다양한 방법으로 메뉴판 이미지를 입력받아 AI가 즉시 구조화된 데이터로 변환</div>
+  </div>
+  <div class="slide-body">
+    <div class="feat-grid">
+      <div class="feat-card t-orange">
+        <div class="fc-icon">📷</div>
+        <h3>카메라 즉시 촬영</h3>
+        <p>모바일 기기의 카메라를 직접 실행해 현장에서 바로 메뉴판을 촬영·업로드</p>
+        <span class="chip chip-orange">모바일 전용</span>
+      </div>
+      <div class="feat-card t-blue">
+        <div class="fc-icon">🖼️</div>
+        <h3>갤러리 이미지 선택</h3>
+        <p>기존에 촬영해둔 이미지를 갤러리에서 선택. <strong>다중 파일 동시 선택</strong> 지원으로 여러 장의 메뉴판을 한 번에 처리</p>
+        <span class="chip chip-blue">다중 선택</span>
+      </div>
+      <div class="feat-card t-teal">
+        <div class="fc-icon">🖱️</div>
+        <h3>PC 드래그앤드롭</h3>
+        <p>PC 환경에서 파일 탐색기의 이미지를 웹 화면으로 끌어다 놓으면 즉시 업로드</p>
+        <span class="chip chip-blue">PC 지원</span>
+      </div>
+      <div class="feat-card t-purple">
+        <div class="fc-icon">🤖</div>
+        <h3>AI OCR + 자동 구조화</h3>
+        <ul>
+          <li>메뉴명·가격·설명·옵션 자동 추출</li>
+          <li>카테고리 자동 분류 (예: 메인, 사이드, 음료)</li>
+          <li>판독 불가 항목 별도 플래그 처리</li>
+          <li>다중 이미지 병렬 분석</li>
+        </ul>
+      </div>
+      <div class="feat-card t-blue">
+        <div class="fc-icon">🖼️</div>
+        <h3>업로드 이미지 미리보기</h3>
+        <p>업로드한 원본 사진을 썸네일로 확인. 탭 전환으로 여러 장 비교 가능하며 팝업으로 원본 확대 열람</p>
+      </div>
+      <div class="feat-card t-green">
+        <div class="fc-icon">⚠️</div>
+        <h3>품질 경고 표시</h3>
+        <p>AI가 판독하기 어려운 항목(흐린 사진, 손글씨 등)을 자동 감지해 검수자에게 경고 배너로 안내</p>
+        <span class="chip chip-orange">리스크 감소</span>
+      </div>
+    </div>
+  </div>
+  <div class="logo">AI 메뉴 검수 시스템</div>
+  <div class="pg">3 / 7</div>
+</div>
+
+<!-- ── SLIDE 4: 핵심 기능 (검수/편집) ── -->
+<div class="slide">
+  <div class="slide-head">
+    <div class="num">Feature 03 · 04</div>
+    <h2>메뉴 검수 &amp; 편집</h2>
+    <div class="desc">AI 초안을 담당자가 직접 수정·보완하여 최종 데이터를 완성하는 인라인 편집 워크플로우</div>
+  </div>
+  <div class="slide-body">
+    <div class="feat-grid">
+      <div class="feat-card t-blue">
+        <div class="fc-icon">✏️</div>
+        <h3>인라인 항목 편집</h3>
+        <ul>
+          <li>메뉴명 직접 수정</li>
+          <li>가격·가격 표기 방식 선택</li>
+          <li>메뉴 설명 텍스트 편집</li>
+          <li>옵션(예: 사이즈, 맛) 추가·삭제</li>
+          <li>이미지 URL 연결</li>
+        </ul>
+      </div>
+      <div class="feat-card t-orange">
+        <div class="fc-icon">🏷️</div>
+        <h3>상태 태그 관리</h3>
+        <ul>
+          <li><strong>품절</strong> 표시 토글</li>
+          <li><strong>메뉴판 미노출</strong> 처리 (숨김)</li>
+          <li><strong>대표 메뉴</strong> 지정</li>
+          <li><strong>신메뉴</strong> 플래그</li>
+        </ul>
+      </div>
+      <div class="feat-card t-green">
+        <div class="fc-icon">➕</div>
+        <h3>항목 추가 / 삭제</h3>
+        <p>AI가 인식하지 못한 메뉴를 수동으로 추가하거나, 불필요한 항목을 즉시 삭제. 항목별 개별 확장·접기 지원</p>
+      </div>
+      <div class="feat-card t-purple">
+        <div class="fc-icon">📂</div>
+        <h3>카테고리 탭 네비게이션</h3>
+        <p>AI가 분류한 카테고리를 상단 탭으로 표시. 스크롤 연동으로 현재 위치 자동 하이라이트. 미분류 항목은 <em>'미맵핑된 디쉬'</em> 탭으로 별도 관리</p>
+      </div>
+      <div class="feat-card t-teal">
+        <div class="fc-icon">⠿</div>
+        <h3>드래그앤드롭 순서 변경</h3>
+        <ul>
+          <li>컴팩트 카드 모드로 전환 (이름·가격만 표시)</li>
+          <li>Ghost 클론 애니메이션으로 부드러운 이동</li>
+          <li>주변 카드 실시간 translateY 반응</li>
+          <li>모바일 터치·PC 포인터 동일 동작</li>
+        </ul>
+        <span class="chip chip-blue">터치 지원</span>
+      </div>
+      <div class="feat-card t-pink">
+        <div class="fc-icon">🔍</div>
+        <h3>이미지 팝업 확대</h3>
+        <p>각 메뉴 항목의 썸네일을 탭하면 원본 이미지를 팝업으로 확대 표시. contain 모드로 전체 이미지를 왜곡 없이 확인</p>
+      </div>
+    </div>
+  </div>
+  <div class="logo">AI 메뉴 검수 시스템</div>
+  <div class="pg">4 / 7</div>
+</div>
+
+<!-- ── SLIDE 5: 도입 전후 비교 ── -->
+<div class="slide">
+  <div class="slide-head">
+    <div class="num">Comparison</div>
+    <h2>도입 전 · 후 비교</h2>
+    <div class="desc">기존 수작업 프로세스 대비 AI 도입 후 변화 항목</div>
+  </div>
+  <div class="slide-body">
+    <table class="compare">
+      <thead>
+        <tr>
+          <th style="width:22%;">항목</th>
+          <th style="width:39%;">도입 전 (수작업)</th>
+          <th style="width:39%;">도입 후 (AI 자동화)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>데이터 입력</strong></td>
+          <td class="bad">메뉴판을 보며 항목 하나씩 수작업 타이핑</td>
+          <td class="good">사진 업로드 → AI 초안 자동 생성 → 검수만 수행</td>
+        </tr>
+        <tr>
+          <td><strong>오류 발생</strong></td>
+          <td class="bad">오탈자·가격 오류·항목 누락 상존, 사람이 직접 대조·검수</td>
+          <td class="good">AI 1차 전처리로 오류 사전 감지, 검수자는 예외만 처리</td>
+        </tr>
+        <tr>
+          <td><strong>처리 속도</strong></td>
+          <td class="bad">메뉴 1건당 수십 초, 전체 메뉴판 처리에 수십 분</td>
+          <td class="good">사진 1장 분석 수 초, 다중 사진 병렬 처리</td>
+        </tr>
+        <tr>
+          <td><strong>판독 어려운 글씨</strong></td>
+          <td class="bad">담당자가 직접 확대·해석 후 입력</td>
+          <td class="good">AI 자동 감지 후 경고 표시, 담당자에게 집중 안내</td>
+        </tr>
+        <tr>
+          <td><strong>카테고리 분류</strong></td>
+          <td class="bad">분류 기준 없이 순서대로 입력</td>
+          <td class="good">AI 자동 분류 + 미분류 항목 별도 관리</td>
+        </tr>
+        <tr>
+          <td><strong>순서 변경</strong></td>
+          <td class="bad">삭제 후 재입력 또는 복사·붙여넣기</td>
+          <td class="good">드래그앤드롭으로 즉시 재배치 <span class="tag-new">NEW</span></td>
+        </tr>
+        <tr>
+          <td><strong>다중 메뉴판</strong></td>
+          <td class="bad">사진별 개별 작업, 결과 수동 통합</td>
+          <td class="good">여러 장 동시 업로드 → 자동 통합 결과 생성</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:16px;font-size:12px;color:var(--gray);">※ 정량적 효과(시간 절감율·오류 감소율)는 운영 데이터 축적 후 측정 예정</div>
+  </div>
+  <div class="logo">AI 메뉴 검수 시스템</div>
+  <div class="pg">5 / 7</div>
+</div>
+
+<!-- ── SLIDE 6: 기술 스택 ── -->
+<div class="slide">
+  <div class="slide-head">
+    <div class="num">Architecture</div>
+    <h2>기술 구성 및 인프라</h2>
+    <div class="desc">경량화된 구성으로 초기 구축 비용 최소화, 트래픽에 따라 자동 확장 가능한 서버리스 아키텍처</div>
+  </div>
+  <div class="slide-body">
+    <div class="feat-grid">
+      <div class="feat-card t-blue" style="grid-row:span 1;">
+        <div class="fc-icon">🌐</div>
+        <h3>프론트엔드</h3>
+        <ul>
+          <li>단일 HTML 파일 (프레임워크 없음)</li>
+          <li>GitHub Pages 무료 호스팅</li>
+          <li>모바일 퍼스트 반응형 설계</li>
+          <li>앱 설치 없이 브라우저에서 즉시 사용</li>
+        </ul>
+        <span class="chip chip-green">비용 ₩0</span>
+      </div>
+      <div class="feat-card t-orange">
+        <div class="fc-icon">⚡</div>
+        <h3>백엔드 서버</h3>
+        <ul>
+          <li>Google Cloud Run (서울 리전)</li>
+          <li>Node.js + Express</li>
+          <li>요청 시만 실행하는 서버리스 방식</li>
+          <li>월 200만 요청까지 무료</li>
+        </ul>
+        <span class="chip chip-green">현재 무료 범위 내</span>
+      </div>
+      <div class="feat-card t-purple">
+        <div class="fc-icon">🤖</div>
+        <h3>AI 엔진</h3>
+        <ul>
+          <li>Google Gemini 2.5 Flash</li>
+          <li>멀티모달 (이미지 + 텍스트)</li>
+          <li>Thinking Budget 6,144 토큰</li>
+          <li>최대 32,768 토큰 출력</li>
+        </ul>
+        <span class="chip chip-orange">건당 ₩4~5</span>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;background:#F8FAFC;border:1.5px solid var(--line);border-radius:12px;padding:18px 20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">월 운영 비용 시뮬레이션 (일 100건 × 22영업일 = 2,200건/월)</div>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:#15803D;"></div>
+          <span style="font-size:13px;">프론트엔드: <strong>₩0</strong></span>
+        </div>
+        <div style="color:var(--line);font-size:18px;">+</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:#15803D;"></div>
+          <span style="font-size:13px;">서버(Cloud Run): <strong>₩0</strong></span>
+        </div>
+        <div style="color:var(--line);font-size:18px;">+</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:#2563EB;"></div>
+          <span style="font-size:13px;">AI API: <strong>₩8,800~₩11,000</strong></span>
+        </div>
+        <div style="color:var(--line);font-size:18px;">=</div>
+        <div style="background:var(--navy);color:#fff;border-radius:8px;padding:6px 16px;font-size:14px;font-weight:700;">
+          월 <span style="color:#60A5FA;">~₩10,000</span> · 연 <span style="color:#60A5FA;">~₩12만</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="logo">AI 메뉴 검수 시스템</div>
+  <div class="pg">6 / 7</div>
+</div>
+
+<!-- ── SLIDE 7: 로드맵 ── -->
+<div class="slide">
+  <div class="slide-head">
+    <div class="num">Roadmap</div>
+    <h2>향후 발전 방향</h2>
+    <div class="desc">현재 운영 중인 v1.0 기능을 기반으로 단계적 확장 계획</div>
+  </div>
+  <div class="slide-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+
+      <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:20px;">
+        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">현재 · v1.0 운영 중</div>
+        <h3 style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:10px;">핵심 기능 완비</h3>
+        <ul style="padding-left:14px;">
+          <li style="font-size:13px;color:#1E3A5F;margin-bottom:4px;">사진 업로드 · AI OCR 분석</li>
+          <li style="font-size:13px;color:#1E3A5F;margin-bottom:4px;">인라인 검수·편집</li>
+          <li style="font-size:13px;color:#1E3A5F;margin-bottom:4px;">카테고리 탭 네비게이션</li>
+          <li style="font-size:13px;color:#1E3A5F;margin-bottom:4px;">드래그앤드롭 순서 변경</li>
+          <li style="font-size:13px;color:#1E3A5F;">결과 복사·출력</li>
+        </ul>
+      </div>
+
+      <div style="background:#DCFCE7;border:1.5px solid #BBF7D0;border-radius:12px;padding:20px;">
+        <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">단기 · 운영 효과 측정</div>
+        <h3 style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:10px;">데이터 기반 ROI 산출</h3>
+        <ul style="padding-left:14px;">
+          <li style="font-size:13px;color:#14532D;margin-bottom:4px;">입력 시간 절감율 측정</li>
+          <li style="font-size:13px;color:#14532D;margin-bottom:4px;">오류 감소 건수 추적</li>
+          <li style="font-size:13px;color:#14532D;margin-bottom:4px;">사용자 피드백 수집</li>
+          <li style="font-size:13px;color:#14532D;">실제 월 비용 vs 공수 비용 비교</li>
+        </ul>
+      </div>
+
+      <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:12px;padding:20px;">
+        <div style="font-size:11px;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">중기 · 기능 확장</div>
+        <h3 style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:10px;">외부 플랫폼 연동</h3>
+        <ul style="padding-left:14px;">
+          <li style="font-size:13px;color:#7C2D12;margin-bottom:4px;">네이버 플레이스 URL → 메뉴 자동 스크래핑</li>
+          <li style="font-size:13px;color:#7C2D12;margin-bottom:4px;">배달의민족 메뉴 비교·동기화</li>
+          <li style="font-size:13px;color:#7C2D12;margin-bottom:4px;">외국어 메뉴판 다국어 번역</li>
+          <li style="font-size:13px;color:#7C2D12;">계절 메뉴·특선 자동 분류</li>
+        </ul>
+      </div>
+
+      <div style="background:#F5F3FF;border:1.5px solid #DDD6FE;border-radius:12px;padding:20px;">
+        <div style="font-size:11px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">장기 · 플랫폼화</div>
+        <h3 style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:10px;">이력 관리 &amp; 자동화</h3>
+        <ul style="padding-left:14px;">
+          <li style="font-size:13px;color:#4C1D95;margin-bottom:4px;">메뉴 변경 이력·버전 히스토리</li>
+          <li style="font-size:13px;color:#4C1D95;margin-bottom:4px;">가격 변동 추적 알림</li>
+          <li style="font-size:13px;color:#4C1D95;margin-bottom:4px;">외부 플랫폼 자동 업데이트</li>
+          <li style="font-size:13px;color:#4C1D95;">다점포 통합 관리 대시보드</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+  <div class="logo">AI 메뉴 검수 시스템</div>
+  <div class="pg">7 / 7</div>
+</div>
+
+</div>
+</body>
+</html>
