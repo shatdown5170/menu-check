@@ -40,14 +40,29 @@ fi
 echo "══════════════════════════════════════════"
 echo " 프로젝트: $PROJECT / 서비스: $SERVICE ($REGION)"
 echo "══════════════════════════════════════════"
-read -rp "① 세일즈 열람용 비밀번호 입력: " VIEW_KEY
-read -rp "② 관리자(업로드용) 비밀번호 입력 (열람용과 다르게): " ADMIN_KEY
-read -rp "③ 시트를 공유받을 개인 구글 이메일 [shatdown112@gmail.com]: " SHARE_EMAIL
+
+# 붙여넣기로 딸려온 줄바꿈 등 대기 중인 입력을 버림 (질문이 건너뛰어지는 것 방지)
+while read -r -t 0.3 _leftover; do :; done || true
+
+# 영문/숫자 4자 이상만 허용 — 잘못 입력하면 종료하지 않고 다시 물어봄
+ask_key() { # $1=변수명  $2=프롬프트
+  local _v=""
+  while true; do
+    read -rp "$2" _v || true
+    if [[ "$_v" =~ ^[A-Za-z0-9]{4,}$ ]]; then break; fi
+    echo "   ⚠️ 영문/숫자 4자 이상으로만 입력해주세요 (한글·공백·특수문자 불가). 다시:"
+  done
+  printf -v "$1" '%s' "$_v"
+}
+
+ask_key VIEW_KEY  "① 세일즈 열람용 비밀번호 (영문/숫자 4자 이상): "
+while true; do
+  ask_key ADMIN_KEY "② 관리자(업로드용) 비밀번호 (열람용과 다르게): "
+  [[ "$ADMIN_KEY" != "$VIEW_KEY" ]] && break
+  echo "   ⚠️ 열람용과 같은 비밀번호는 안 됩니다. 다시:"
+done
+read -rp "③ 시트를 공유받을 개인 구글 이메일 [shatdown112@gmail.com]: " SHARE_EMAIL || true
 SHARE_EMAIL=${SHARE_EMAIL:-shatdown112@gmail.com}
-if [[ -z "$VIEW_KEY" || -z "$ADMIN_KEY" ]]; then
-  echo "❌ 비밀번호 두 개를 모두 입력해야 합니다."
-  exit 1
-fi
 
 echo ""
 echo "▶ 1/5 API 활성화 (Sheets, Drive)…"
