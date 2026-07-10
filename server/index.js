@@ -213,6 +213,28 @@ async function getAccessToken() {
   const now = Math.floor(Date.now() / 1000);
   if (cachedToken && cachedToken.exp - 60 > now) return cachedToken.token;
 
+  // 키 JSON이 있으면 그걸 쓰고(로컬 실행용), 없으면 Cloud Run 런타임
+  // 서비스 계정 토큰을 메타데이터 서버에서 받는다(키 파일 불필요).
+  const { token, expiresIn } = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+    ? await tokenFromKeyJson()
+    : await tokenFromMetadata();
+  cachedToken = { token, exp: now + (expiresIn || 3600) };
+  return cachedToken.token;
+}
+
+async function tokenFromMetadata() {
+  const scopes = encodeURIComponent("https://www.googleapis.com/auth/spreadsheets");
+  const res = await fetch(
+    `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token?scopes=${scopes}`,
+    { headers: { "Metadata-Flavor": "Google" } }
+  ).catch((e) => { throw new Error(`메타데이터 서버 접근 실패 (${e.message}) — GCP 밖에서 실행 중이면 GOOGLE_SERVICE_ACCOUNT_JSON을 설정하세요.`); });
+  if (!res.ok) throw new Error(`런타임 서비스 계정 토큰 발급 실패 (HTTP ${res.status})`);
+  const data = await res.json();
+  return { token: data.access_token, expiresIn: data.expires_in };
+}
+
+async function tokenFromKeyJson() {
+  const now = Math.floor(Date.now() / 1000);
   const sa = getServiceAccount();
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = b64url(JSON.stringify({
@@ -238,8 +260,7 @@ async function getAccessToken() {
   if (!res.ok || !data.access_token) {
     throw new Error(`구글 인증 실패: ${data.error_description || data.error || res.status}`);
   }
-  cachedToken = { token: data.access_token, exp: now + (data.expires_in || 3600) };
-  return cachedToken.token;
+  return { token: data.access_token, expiresIn: data.expires_in };
 }
 
 async function sheetsApi(path, options = {}) {
