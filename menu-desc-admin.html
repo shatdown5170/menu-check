@@ -336,13 +336,39 @@ $("tab-x").addEventListener("click", ()=>switchTab("x"));
    · '디쉬그룹 설명'/'디쉬 설명'/'메뉴 설명' 라벨 줄 → 라벨만이면 건너뛰고,
      라벨 아래 글이 같은 블록에 있으면 매장 소개문으로 처리
    · 일반 블록 → 첫 줄 = 디쉬명, 나머지 = 디쉬 설명 */
+// 빈 줄 없이 붙여넣어진 경우: 문장 형태(…입니다. / …세요. 등)면 설명,
+// 아니면 새 디쉬명으로 판단해 줄 단위로 블록을 재구성
+function lineFallbackBlocks(lines, labelRe){
+  const isDescLine = (l)=> /[.!?。]$/.test(l) || l.length > 35;
+  const blocks = [];
+  let cur = null;
+  for(const l of lines){
+    const isHeader = labelRe.test(l) || /^\[.+\]$/.test(l);
+    if(isHeader || !cur || !isDescLine(l)){
+      if(cur) blocks.push(cur);
+      cur = [l];
+    }else{
+      cur.push(l);
+    }
+  }
+  if(cur) blocks.push(cur);
+  return blocks;
+}
+
 function parseAiText(text){
-  const blocks = text.replace(/\r\n?/g,"\n").split(/\n\s*\n+/)
+  const labelRe = /^(디쉬\s*그룹\s*설명|디쉬\s*설명|메뉴\s*설명)\s*[:：]?$/;
+  let blocks = text.replace(/\r\n?/g,"\n").split(/\n\s*\n+/)
     .map(b=>b.split("\n").map(l=>l.trim()).filter(l=>l!==""))
     .filter(b=>b.length>0);
   const rows = [];
   const warnings = [];
-  const labelRe = /^(디쉬\s*그룹\s*설명|디쉬\s*설명|메뉴\s*설명)\s*[:：]?$/;
+
+  // 빈 줄 구분이 없으면(전체가 한 블록) 줄 단위 휴리스틱으로 재구성
+  let lineMode = false;
+  if(blocks.length === 1 && blocks[0].length >= 4){
+    blocks = lineFallbackBlocks(blocks[0], labelRe);
+    lineMode = true;
+  }
 
   for(const block of blocks){
     const first = block[0];
@@ -363,8 +389,8 @@ function parseAiText(text){
       if(first.length > 60) warnings.push(`"${first.slice(0,30)}…" — 디쉬명이 60자를 넘습니다. 붙여넣기 형식(빈 줄 구분)을 확인해주세요`);
     }
   }
-  if(blocks.length === 1 && blocks[0].length >= 6){
-    warnings.unshift("빈 줄(문단 구분)이 없어 전체가 한 블록으로 인식됐습니다. AI 답변을 원문 그대로 복사했는지 확인해주세요.");
+  if(lineMode){
+    warnings.unshift("빈 줄 구분이 없어 문장 형태를 보고 디쉬명/설명을 자동으로 나눴어요. 아래 미리보기에서 꼭 확인해주세요.");
   }
   return { rows, warnings };
 }
