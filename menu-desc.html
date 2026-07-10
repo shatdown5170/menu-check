@@ -7,188 +7,245 @@
 <meta name="supported-color-schemes" content="light">
 <title>메뉴 설명 조회</title>
 <style>
+  @font-face{font-family:"Pretendard";font-weight:400;font-style:normal;font-display:swap;
+    src:url("fonts/Pretendard-Regular.woff2") format("woff2");}
+  @font-face{font-family:"Pretendard";font-weight:700;font-style:normal;font-display:swap;
+    src:url("fonts/Pretendard-Bold.woff2") format("woff2");}
+  @font-face{font-family:"Pretendard";font-weight:800;font-style:normal;font-display:swap;
+    src:url("fonts/Pretendard-ExtraBold.woff2") format("woff2");}
+
   :root{
     color-scheme: light only;
-    --ink:#37352F; --gray:#9B9A97; --gray2:#787774;
-    --line:#EAE9E5; --line2:#EDEDEC; --bg:#F7F6F3; --card:#FFFFFF; --hover:#EFEEEA;
-    --pill:#EDECE8; --pill-on:#E3E2DD;
-    --blue:#2383E2; --blue-soft:#E7F1FB;
-    --green-bg:#DBEDDB; --green-fg:#448361;
-    --radius:12px;
+    --ink:#212124; --sub:#8B95A1; --sub2:#6B7684; --body:#454C53;
+    --line:#F2F3F5; --line2:#E5E8EB; --band:#F7F8FA;
+    --blue:#00A8F0; --blue-press:#0092D6; --blue-tint:#EAF7FE; --blue-deep:#0087C4;
+    --orange:#FF6F0F;
+    --shell:#EEF1F6;
   }
   @media (prefers-color-scheme: dark){
-    html,body{background:#F7F6F3 !important;color:#37352F !important;}
+    html,body{background:var(--shell) !important;color:var(--ink) !important;}
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Pretendard",Roboto,"Malgun Gothic",sans-serif;
-    -webkit-font-smoothing:antialiased;}
-  body{line-height:1.5;max-width:680px;margin:0 auto;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--shell);color:var(--ink);
+    font-family:"Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Malgun Gothic",sans-serif;
+    -webkit-font-smoothing:antialiased;overflow:hidden;
+  }
 
-  .top{position:sticky;top:0;z-index:10;background:rgba(247,246,243,.92);backdrop-filter:saturate(180%) blur(14px);
-    padding:18px 20px 14px;border-bottom:1px solid var(--line2);}
-  .top h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;}
-  .top p{margin:4px 0 0;font-size:13.5px;color:var(--gray);}
+  /* ── 앱 컨테이너 (모바일 풀블리드, 데스크톱 중앙 480px) ── */
+  #app{
+    position:relative;height:100dvh;max-width:480px;margin:0 auto;background:#fff;overflow:hidden;
+  }
+  @media (min-width:520px){
+    #app{box-shadow:0 0 0 1px rgba(15,23,42,.07), 0 18px 60px rgba(15,23,42,.16);}
+  }
 
-  .wrap{padding:16px 20px 140px;}
+  .screen{
+    position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;
+    transition:transform .28s cubic-bezier(.32,.72,.35,1);
+  }
+  #scr-detail{transform:translateX(102%);box-shadow:-12px 0 32px rgba(0,0,0,.08);}
+  #app.detail-open #scr-detail{transform:translateX(0);}
+  @media (prefers-reduced-motion: reduce){ .screen{transition:none;} }
+
+  .scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
 
   /* ── 비밀번호 게이트 ── */
-  #gate{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px;}
+  #gate{position:absolute;inset:0;z-index:100;background:#fff;display:none;align-items:center;justify-content:center;padding:24px;}
   #gate.show{display:flex;}
-  .gate-box{width:100%;max-width:340px;text-align:center;}
+  .gate-box{width:100%;max-width:320px;text-align:center;}
   .gate-box .emoji{font-size:44px;}
-  .gate-box h2{margin:12px 0 4px;font-size:20px;font-weight:800;}
-  .gate-box p{margin:0 0 20px;font-size:14px;color:var(--gray2);}
-  .gate-box input{width:100%;padding:14px 16px;font-size:17px;border:1.5px solid var(--line);border-radius:var(--radius);
-    background:var(--card);text-align:center;letter-spacing:2px;outline:none;}
+  .gate-box h2{margin:14px 0 4px;font-size:21px;font-weight:800;letter-spacing:-.4px;}
+  .gate-box p{margin:0 0 22px;font-size:14px;color:var(--sub);}
+  .gate-box input{width:100%;padding:15px 16px;font-size:16px;border:1px solid var(--line2);border-radius:12px;
+    background:#fff;text-align:center;letter-spacing:2px;outline:none;font-family:inherit;}
   .gate-box input:focus{border-color:var(--blue);}
-  .gate-box button{width:100%;margin-top:12px;padding:14px;font-size:16px;font-weight:700;color:#fff;background:var(--ink);
-    border:none;border-radius:var(--radius);cursor:pointer;}
-  .gate-err{margin-top:10px;font-size:13.5px;color:#D9730D;min-height:20px;}
+  .gate-box button{width:100%;margin-top:10px;padding:16px;font-size:16px;font-weight:700;color:#fff;background:var(--blue);
+    border:none;border-radius:12px;cursor:pointer;font-family:inherit;}
+  .gate-box button:active{background:var(--blue-press);}
+  .gate-err{margin-top:12px;font-size:13.5px;color:var(--orange);min-height:20px;}
 
-  /* ── 검색 ── */
-  .search{position:relative;margin-bottom:14px;}
-  .search input{width:100%;padding:13px 16px 13px 42px;font-size:16px;border:1.5px solid var(--line);border-radius:var(--radius);
-    background:var(--card);outline:none;}
-  .search input:focus{border-color:var(--blue);}
-  .search .icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--gray);}
-  .meta-line{font-size:12.5px;color:var(--gray);margin:0 2px 10px;}
+  /* ── 목록 화면 ── */
+  .home-head{flex-shrink:0;padding:20px 20px 4px;}
+  .home-head h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.5px;}
+  .home-head p{margin:4px 0 0;font-size:13px;color:var(--sub);}
+  .search-wrap{flex-shrink:0;padding:12px 20px 6px;}
+  .search-pill{display:flex;align-items:center;gap:10px;border:1px solid var(--line2);border-radius:26px;
+    padding:13px 18px;box-shadow:0 2px 10px rgba(33,33,36,.05);background:#fff;}
+  .search-pill svg{flex-shrink:0;color:#B0B8C1;}
+  .search-pill input{border:none;outline:none;background:none;flex:1;min-width:0;font-size:15px;color:var(--ink);font-family:inherit;}
+  .search-pill input::placeholder{color:#B0B8C1;}
 
-  /* ── 스토어 목록 ── */
-  .store-item{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;
-    display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s;}
-  .store-item:active{background:var(--hover);}
-  .store-item .info{flex:1;min-width:0;}
-  .store-item .name{font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .store-item .sub{font-size:12.5px;color:var(--gray);margin-top:2px;}
-  .store-item .arrow{color:var(--gray);font-size:18px;}
-  .empty{text-align:center;padding:60px 20px;color:var(--gray);font-size:14.5px;}
-  .empty .emoji{font-size:40px;display:block;margin-bottom:10px;}
+  .band{background:var(--band);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;
+    font-size:14.5px;font-weight:700;letter-spacing:-.2px;}
+  .band .tag{font-size:12.5px;font-weight:700;color:var(--orange);}
 
-  /* ── 스토어 상세 ── */
-  #detail{display:none;}
-  #detail.show{display:block;}
-  #list-view.hide{display:none;}
-  .back-btn{display:inline-flex;align-items:center;gap:6px;font-size:14.5px;font-weight:600;color:var(--gray2);
-    background:var(--pill);border:none;border-radius:99px;padding:8px 16px 8px 12px;cursor:pointer;margin-bottom:14px;}
-  .store-head{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
-  .store-head h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-0.4px;}
-  .store-head .sub{font-size:13px;color:var(--gray);margin-top:6px;display:flex;flex-wrap:wrap;gap:6px 12px;}
-  .intro-card{background:var(--blue-soft);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;}
-  .intro-card .i-tag{font-size:11.5px;font-weight:800;color:var(--blue);margin-bottom:4px;}
-  .intro-card .i-text{font-size:14px;white-space:pre-wrap;word-break:break-word;}
-  .group-head{margin:20px 2px 10px;padding-bottom:8px;border-bottom:2px solid var(--pill-on);}
-  .group-head .g-name{font-size:17px;font-weight:800;}
-  .group-head .g-desc{font-size:13px;color:var(--gray2);margin-top:3px;white-space:pre-wrap;word-break:break-word;}
-  .menu-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:10px;}
-  .menu-card .m-name{font-size:16px;font-weight:700;display:flex;gap:8px;}
-  .menu-card .m-name .num{color:var(--gray);font-weight:600;flex-shrink:0;}
-  .menu-card .m-desc{font-size:14.5px;color:var(--gray2);margin-top:8px;white-space:pre-wrap;word-break:break-word;}
+  .store-row{display:flex;align-items:center;gap:14px;padding:17px 20px;cursor:pointer;border-bottom:1px solid var(--line);}
+  .store-row:active{background:var(--band);}
+  .store-row .thumb{width:46px;height:46px;border-radius:12px;background:var(--blue-tint);color:var(--blue-deep);
+    display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;flex-shrink:0;}
+  .store-row .info{flex:1;min-width:0;}
+  .store-row .name{font-size:16px;font-weight:700;letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .store-row .meta{font-size:12.5px;color:var(--sub);margin-top:3px;}
+  .store-row .chev{color:#C4CAD4;flex-shrink:0;}
+  .list-state{padding:64px 20px;text-align:center;color:var(--sub);font-size:14px;line-height:1.7;}
+  .list-state .emoji{font-size:38px;display:block;margin-bottom:10px;}
+  .list-state button{margin-top:14px;padding:11px 22px;font-size:14px;font-weight:700;color:var(--ink);
+    background:#F2F4F6;border:none;border-radius:10px;cursor:pointer;font-family:inherit;}
 
-  /* ── 하단 액션 바 ── */
-  .action-bar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:none;gap:10px;padding:14px 20px calc(14px + env(safe-area-inset-bottom));
-    background:rgba(247,246,243,.92);backdrop-filter:saturate(180%) blur(14px);border-top:1px solid var(--line2);
-    max-width:680px;margin:0 auto;}
-  .action-bar.show{display:flex;}
-  .action-bar button{flex:1;padding:15px 8px;font-size:15.5px;font-weight:700;border:none;border-radius:var(--radius);cursor:pointer;}
-  .btn-copy{background:var(--pill-on);color:var(--ink);}
-  .btn-img{background:var(--ink);color:#fff;}
-  .action-bar button:disabled{opacity:.5;}
+  /* ── 상세 화면 ── */
+  .appbar{flex-shrink:0;height:54px;display:flex;align-items:center;gap:4px;padding:0 8px;
+    background:#fff;border-bottom:1px solid var(--line);position:relative;z-index:5;}
+  .appbar .title{position:absolute;left:56px;right:56px;text-align:center;font-size:17px;font-weight:700;letter-spacing:-.3px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .icon-btn{width:44px;height:44px;border:none;background:none;border-radius:50%;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:var(--ink);}
+  .icon-btn:active{background:var(--band);}
+  .appbar .spacer{margin-left:auto;}
 
-  /* ── 토스트 ── */
-  #toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%) translateY(20px);z-index:200;
-    background:var(--ink);color:#fff;font-size:14px;font-weight:600;padding:11px 20px;border-radius:99px;
-    opacity:0;pointer-events:none;transition:.25s;white-space:nowrap;}
-  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .store-head{padding:20px 20px 16px;border-bottom:1px solid var(--line);}
+  .store-head h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-.5px;}
+  .store-head .meta{margin-top:6px;font-size:13px;color:var(--sub);display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .store-head .meta .dot::before{content:"·";margin-right:6px;color:#C4CAD4;}
+  .chip{display:inline-flex;align-items:center;gap:4px;margin-top:10px;background:var(--blue-tint);color:var(--blue-deep);
+    font-size:12px;font-weight:700;border-radius:6px;padding:5px 9px;}
 
-  /* ── 이미지 결과 모달 ── */
-  #img-modal{position:fixed;inset:0;z-index:150;background:rgba(55,53,47,.45);display:none;align-items:flex-end;justify-content:center;}
-  #img-modal.show{display:flex;}
-  .modal-sheet{background:var(--bg);width:100%;max-width:680px;max-height:88vh;border-radius:18px 18px 0 0;
-    display:flex;flex-direction:column;overflow:hidden;}
-  .modal-head{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line2);}
-  .modal-head h3{margin:0;font-size:17px;font-weight:800;}
-  .modal-head button{background:var(--pill);border:none;border-radius:99px;width:32px;height:32px;font-size:15px;cursor:pointer;color:var(--gray2);}
-  .modal-body{overflow-y:auto;padding:16px 20px calc(20px + env(safe-area-inset-bottom));}
-  .modal-tip{font-size:12.5px;color:var(--gray);background:var(--pill);border-radius:8px;padding:10px 12px;margin-bottom:14px;}
+  .intro{padding:16px 20px;border-bottom:8px solid var(--band);}
+  .intro .label{font-size:12px;font-weight:800;color:var(--blue);margin-bottom:6px;letter-spacing:.2px;}
+  .intro .text{font-size:14px;color:var(--sub2);line-height:1.65;white-space:pre-wrap;word-break:break-word;}
+
+  .g-desc-row{padding:13px 20px;border-bottom:1px solid var(--line);font-size:13.5px;color:var(--sub);line-height:1.6;
+    white-space:pre-wrap;word-break:break-word;}
+  .menu-row{padding:17px 20px;border-bottom:1px solid var(--line);}
+  .menu-row .m-name{font-size:15.5px;font-weight:700;letter-spacing:-.3px;word-break:break-word;}
+  .menu-row .m-desc{font-size:13.5px;color:var(--sub);line-height:1.6;margin-top:5px;white-space:pre-wrap;word-break:break-word;}
+  .group-gap{height:8px;background:var(--band);}
+  .list-tail{height:100px;}
+
+  /* ── 하단 CTA 바 ── */
+  .cta-bar{position:absolute;left:0;right:0;bottom:0;z-index:10;display:flex;gap:9px;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, #fff 78%, rgba(255,255,255,0));}
+  .btn{border:none;border-radius:10px;cursor:pointer;font-family:inherit;font-size:16px;font-weight:700;
+    letter-spacing:-.2px;padding:16px 0;transition:background .12s;}
+  .btn:disabled{opacity:.5;}
+  .btn-secondary{flex:1;background:#F2F4F6;color:var(--ink);}
+  .btn-secondary:active{background:#E5E8EB;}
+  .btn-primary{flex:1.6;background:var(--blue);color:#fff;}
+  .btn-primary:active{background:var(--blue-press);}
+
+  /* ── 이미지 저장 바텀시트 ── */
+  .sheet-dim{position:absolute;inset:0;z-index:20;background:rgba(33,33,36,.5);opacity:0;pointer-events:none;transition:opacity .22s;}
+  .sheet{position:absolute;left:0;right:0;bottom:0;z-index:21;background:#fff;border-radius:20px 20px 0 0;
+    display:flex;flex-direction:column;max-height:86%;
+    transform:translateY(105%);transition:transform .28s cubic-bezier(.32,.72,.35,1);}
+  #app.sheet-open .sheet-dim{opacity:1;pointer-events:auto;}
+  #app.sheet-open .sheet{transform:translateY(0);}
+  .sheet .handle{width:40px;height:4px;border-radius:2px;background:#E5E8EB;margin:10px auto 4px;flex-shrink:0;}
+  .sheet-head{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:6px 20px 10px;}
+  .sheet-head h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.3px;}
+  .sheet-head button{background:#F2F4F6;border:none;border-radius:50%;width:30px;height:30px;font-size:14px;
+    cursor:pointer;color:var(--sub2);font-family:inherit;}
+  .sheet-body{overflow-y:auto;padding:0 20px calc(20px + env(safe-area-inset-bottom));}
+  .sheet-tip{font-size:12.5px;color:var(--sub2);background:var(--band);border-radius:10px;padding:11px 13px;margin-bottom:14px;line-height:1.55;}
   .img-page{margin-bottom:18px;}
-  .img-page .pg-label{font-size:13px;font-weight:700;color:var(--gray2);margin-bottom:6px;}
-  .img-page img{width:100%;border:1px solid var(--line);border-radius:10px;display:block;}
+  .img-page .pg-label{font-size:13px;font-weight:700;color:var(--sub2);margin-bottom:6px;}
+  .img-page img{width:100%;border:1px solid var(--line2);border-radius:12px;display:block;}
   .img-page .pg-btns{display:flex;gap:8px;margin-top:8px;}
-  .img-page .pg-btns button{flex:1;padding:11px;font-size:14px;font-weight:700;border:none;border-radius:10px;cursor:pointer;}
-  .pg-dl{background:var(--ink);color:#fff;}
-  .pg-share{background:var(--pill-on);color:var(--ink);}
+  .img-page .pg-btns button{flex:1;padding:13px;font-size:14px;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-family:inherit;}
+  .pg-dl{background:var(--blue);color:#fff;}
+  .pg-dl:active{background:var(--blue-press);}
+  .pg-share{background:#F2F4F6;color:var(--ink);}
 
-  /* ── 로딩 오버레이 ── */
-  #busy{position:fixed;inset:0;z-index:180;background:rgba(247,246,243,.75);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+  /* ── 토스트 / 로딩 ── */
+  .toast{position:absolute;left:50%;bottom:108px;transform:translateX(-50%) translateY(14px);z-index:30;
+    background:rgba(33,33,36,.92);color:#fff;font-size:13.5px;font-weight:700;padding:12px 20px;border-radius:24px;
+    opacity:0;pointer-events:none;transition:.25s;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #busy{position:absolute;inset:0;z-index:80;background:rgba(255,255,255,.8);display:none;
+    align-items:center;justify-content:center;flex-direction:column;gap:14px;}
   #busy.show{display:flex;}
-  .spinner{width:34px;height:34px;border:3.5px solid var(--pill-on);border-top-color:var(--ink);border-radius:50%;animation:spin .8s linear infinite;}
+  .spinner{width:34px;height:34px;border:3.5px solid var(--blue-tint);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
-  #busy .msg{font-size:14.5px;font-weight:600;color:var(--gray2);}
+  #busy .msg{font-size:14.5px;font-weight:700;color:var(--sub2);}
 
-  .loading-center{text-align:center;padding:70px 20px;color:var(--gray);}
+  button:focus-visible, input:focus-visible, .store-row:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
 </style>
 </head>
 <body>
+<div id="app">
 
-<!-- 비밀번호 게이트 -->
-<div id="gate">
-  <div class="gate-box">
-    <div class="emoji">🔐</div>
-    <h2>메뉴 설명 조회</h2>
-    <p>접속 비밀번호를 입력해주세요</p>
-    <input id="gate-input" type="password" inputmode="text" autocomplete="off" placeholder="비밀번호">
-    <button id="gate-btn">확인</button>
-    <div class="gate-err" id="gate-err"></div>
-  </div>
-</div>
-
-<div class="top">
-  <h1>🍽️ 메뉴 설명 조회</h1>
-  <p>스토어를 검색하고, 메뉴 설명을 이미지·텍스트로 저장하세요</p>
-</div>
-
-<div class="wrap">
-  <!-- 목록 화면 -->
-  <div id="list-view">
-    <div class="search">
-      <span class="icon">🔍</span>
-      <input id="search-input" type="search" placeholder="스토어 ID 또는 상호명 검색" autocomplete="off">
+  <!-- ═══ 화면 1: 스토어 목록 ═══ -->
+  <div class="screen" id="scr-list">
+    <div class="home-head">
+      <h1>메뉴 설명 조회</h1>
+      <p>스토어를 검색하고 메뉴 설명을 저장하세요</p>
     </div>
-    <div class="meta-line" id="meta-line"></div>
-    <div id="store-list"><div class="loading-center">데이터를 불러오는 중…</div></div>
-  </div>
-
-  <!-- 상세 화면 -->
-  <div id="detail">
-    <button class="back-btn" id="back-btn">‹ 목록으로</button>
-    <div class="store-head">
-      <h2 id="d-name"></h2>
-      <div class="sub" id="d-sub"></div>
+    <div class="search-wrap">
+      <div class="search-pill">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+        <input id="search-input" type="search" placeholder="스토어 ID 또는 상호명 검색" autocomplete="off">
+      </div>
     </div>
-    <div id="d-menus"></div>
+    <div class="scroll">
+      <div class="band"><span id="band-label">전체 스토어</span><span class="tag" id="band-count"></span></div>
+      <div id="store-list"><div class="list-state">데이터를 불러오는 중…</div></div>
+    </div>
   </div>
-</div>
 
-<!-- 하단 액션 바 (상세 화면에서만) -->
-<div class="action-bar" id="action-bar">
-  <button class="btn-copy" id="btn-copy">📋 텍스트 복사</button>
-  <button class="btn-img" id="btn-img">📷 이미지 저장</button>
-</div>
+  <!-- ═══ 화면 2: 스토어 상세 ═══ -->
+  <div class="screen" id="scr-detail">
+    <div class="appbar">
+      <button class="icon-btn" id="btn-back" aria-label="뒤로">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="title" id="d-title"></div>
+      <button class="icon-btn spacer" id="btn-share-top" aria-label="공유">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><path d="M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v7a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-7"/></svg>
+      </button>
+    </div>
+    <div class="scroll" id="d-scroll">
+      <div class="store-head">
+        <h2 id="d-name"></h2>
+        <div class="meta" id="d-meta"></div>
+        <div class="chip">✓ AI 메뉴 설명 제작 완료</div>
+      </div>
+      <div id="d-body"></div>
+      <div class="list-tail"></div>
+    </div>
+    <div class="cta-bar">
+      <button class="btn btn-secondary" id="btn-copy">텍스트 복사</button>
+      <button class="btn btn-primary" id="btn-img">이미지 저장</button>
+    </div>
+  </div>
 
-<!-- 이미지 결과 모달 -->
-<div id="img-modal">
-  <div class="modal-sheet">
-    <div class="modal-head">
+  <!-- ═══ 이미지 저장 바텀시트 ═══ -->
+  <div class="sheet-dim" id="sheet-dim"></div>
+  <div class="sheet" id="img-modal">
+    <div class="handle"></div>
+    <div class="sheet-head">
       <h3 id="modal-title">이미지 저장</h3>
-      <button id="modal-close">✕</button>
+      <button id="modal-close" aria-label="닫기">✕</button>
     </div>
-    <div class="modal-body" id="modal-body"></div>
+    <div class="sheet-body" id="modal-body"></div>
   </div>
-</div>
 
-<div id="busy"><div class="spinner"></div><div class="msg" id="busy-msg">처리 중…</div></div>
-<div id="toast"></div>
+  <!-- 비밀번호 게이트 -->
+  <div id="gate">
+    <div class="gate-box">
+      <div class="emoji">🔐</div>
+      <h2>메뉴 설명 조회</h2>
+      <p>접속 비밀번호를 입력해주세요</p>
+      <input id="gate-input" type="password" inputmode="text" autocomplete="off" placeholder="비밀번호">
+      <button id="gate-btn">확인</button>
+      <div class="gate-err" id="gate-err"></div>
+    </div>
+  </div>
+
+  <div id="busy"><div class="spinner"></div><div class="msg" id="busy-msg">처리 중…</div></div>
+  <div class="toast" id="toast"></div>
+</div>
 
 <script>
 /* ═══════════ 설정 ═══════════ */
@@ -196,11 +253,13 @@ const SERVER_URL = "https://menu-check-564449764059.asia-northeast3.run.app";
 const KEY_STORAGE = "md_access_key";
 
 /* ═══════════ 상태 ═══════════ */
-let stores = [];          // [{id,name,updatedAt,menus:[{name,desc}]}]
+let stores = [];
 let currentStore = null;
-let objectUrls = [];      // 모달 닫을 때 해제
+let objectUrls = [];
 
 const $ = (id)=>document.getElementById(id);
+const app = $("app");
+const menuCount = (s)=>(s.groups||[]).reduce((a,g)=>a+g.menus.length, 0);
 
 function toast(msg){
   const t = $("toast");
@@ -212,6 +271,9 @@ function toast(msg){
 function busy(on, msg){
   $("busy").classList.toggle("show", !!on);
   if(msg) $("busy-msg").textContent = msg;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
 /* ═══════════ 인증 ═══════════ */
@@ -246,7 +308,7 @@ $("gate-input").addEventListener("keydown", e=>{ if(e.key==="Enter") gateSubmit(
 
 /* ═══════════ 데이터 로드 ═══════════ */
 async function loadData(){
-  $("store-list").innerHTML = '<div class="loading-center">데이터를 불러오는 중…</div>';
+  $("store-list").innerHTML = '<div class="list-state">데이터를 불러오는 중…</div>';
   try{
     const r = await fetch(SERVER_URL + "/menu-desc/data", { headers: { "x-access-key": getKey() } });
     if(r.status === 401){
@@ -259,43 +321,39 @@ async function loadData(){
     stores = (data.stores || []).sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||""));
     renderList();
   }catch(e){
-    $("store-list").innerHTML = '<div class="empty"><span class="emoji">⚠️</span>불러오기 실패: ' + escapeHtml(String(e.message||e)) + '<br><br><button class="back-btn" onclick="loadData()">다시 시도</button></div>';
+    $("store-list").innerHTML = '<div class="list-state"><span class="emoji">⚠️</span>불러오기 실패<br>' +
+      escapeHtml(String(e.message||e)) + '<br><button onclick="loadData()">다시 시도</button></div>';
   }
 }
 
 /* ═══════════ 목록 & 검색 ═══════════ */
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-}
-
-function menuCount(s){ return (s.groups||[]).reduce((a,g)=>a+g.menus.length, 0); }
-
 function renderList(){
   const q = $("search-input").value.trim().toLowerCase();
   const filtered = q
     ? stores.filter(s => s.id.toLowerCase().includes(q) || (s.name||"").toLowerCase().includes(q))
     : stores;
 
-  $("meta-line").textContent = q
-    ? `검색 결과 ${filtered.length}개 스토어`
-    : `총 ${stores.length}개 스토어`;
+  $("band-label").textContent = q ? "검색 결과" : "전체 스토어";
+  $("band-count").textContent = filtered.length + "개";
 
   if(filtered.length === 0){
     $("store-list").innerHTML = stores.length === 0
-      ? '<div class="empty"><span class="emoji">📭</span>아직 업로드된 데이터가 없습니다</div>'
-      : '<div class="empty"><span class="emoji">🔍</span>검색 결과가 없습니다</div>';
+      ? '<div class="list-state"><span class="emoji">📭</span>아직 업로드된 데이터가 없습니다</div>'
+      : '<div class="list-state"><span class="emoji">🔍</span>검색 결과가 없어요<br>스토어 ID나 상호명을 다시 확인해주세요</div>';
     return;
   }
-  $("store-list").innerHTML = filtered.slice(0, 200).map((s,i)=>`
-    <div class="store-item" data-id="${escapeHtml(s.id)}">
+  $("store-list").innerHTML = filtered.slice(0, 200).map(s=>`
+    <div class="store-row" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
+      <div class="thumb">${escapeHtml((s.name||"?").trim().charAt(0))}</div>
       <div class="info">
         <div class="name">${escapeHtml(s.name || "(상호명 없음)")}</div>
-        <div class="sub">ID ${escapeHtml(s.id)} · 메뉴 ${menuCount(s)}개${s.updatedAt ? " · " + escapeHtml(s.updatedAt.slice(0,10)) : ""}</div>
+        <div class="meta">ID ${escapeHtml(s.id)} · 메뉴 ${menuCount(s)}개${s.updatedAt ? " · " + escapeHtml(s.updatedAt.slice(5,10).replace("-",".")) + " 업데이트" : ""}</div>
       </div>
-      <div class="arrow">›</div>
+      <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
     </div>`).join("");
-  $("store-list").querySelectorAll(".store-item").forEach(el=>{
+  $("store-list").querySelectorAll(".store-row").forEach(el=>{
     el.addEventListener("click", ()=>openDetail(el.dataset.id));
+    el.addEventListener("keydown", e=>{ if(e.key==="Enter") openDetail(el.dataset.id); });
   });
 }
 $("search-input").addEventListener("input", renderList);
@@ -304,45 +362,38 @@ $("search-input").addEventListener("input", renderList);
 function openDetail(id){
   currentStore = stores.find(s=>s.id===id);
   if(!currentStore) return;
+  $("d-title").textContent = currentStore.name || "(상호명 없음)";
   $("d-name").textContent = currentStore.name || "(상호명 없음)";
-  $("d-sub").innerHTML =
-    `<span>스토어 ID <b>${escapeHtml(currentStore.id)}</b></span>` +
-    `<span>메뉴 ${menuCount(currentStore)}개</span>` +
-    (currentStore.updatedAt ? `<span>업데이트 ${escapeHtml(currentStore.updatedAt.slice(0,10))}</span>` : "");
+  $("d-meta").innerHTML =
+    `<span>스토어 ID ${escapeHtml(currentStore.id)}</span>` +
+    `<span class="dot">메뉴 ${menuCount(currentStore)}개</span>` +
+    (currentStore.updatedAt ? `<span class="dot">${escapeHtml(currentStore.updatedAt.slice(5,10).replace("-","."))} 업데이트</span>` : "");
 
   let html = "";
   if(currentStore.intro){
-    html += `<div class="intro-card"><div class="i-tag">매장 소개</div><div class="i-text">${escapeHtml(currentStore.intro)}</div></div>`;
+    html += `<div class="intro"><div class="label">매장 소개</div><div class="text">${escapeHtml(currentStore.intro)}</div></div>`;
   }
-  let n = 0;
-  for(const g of currentStore.groups){
+  currentStore.groups.forEach((g, gi)=>{
     if(g.name || g.desc){
-      html += `<div class="group-head"><div class="g-name">${escapeHtml(g.name || "기타")}</div>${
-        g.desc ? `<div class="g-desc">${escapeHtml(g.desc)}</div>` : ""}</div>`;
+      if(gi > 0) html += `<div class="group-gap"></div>`;
+      html += `<div class="band g-band"><span>${escapeHtml(g.name || "기타")}</span><span class="tag">메뉴 ${g.menus.length}개</span></div>`;
+      if(g.desc) html += `<div class="g-desc-row">${escapeHtml(g.desc)}</div>`;
     }
     for(const m of g.menus){
-      n++;
-      html += `
-    <div class="menu-card">
-      <div class="m-name"><span class="num">${n}.</span><span>${escapeHtml(m.name)}</span></div>
-      ${m.desc ? `<div class="m-desc">${escapeHtml(m.desc)}</div>` : ""}
-    </div>`;
+      html += `<div class="menu-row"><div class="m-name">${escapeHtml(m.name)}</div>${
+        m.desc ? `<div class="m-desc">${escapeHtml(m.desc)}</div>` : ""}</div>`;
     }
-  }
-  $("d-menus").innerHTML = html;
-  $("list-view").classList.add("hide");
-  $("detail").classList.add("show");
-  $("action-bar").classList.add("show");
-  window.scrollTo(0,0);
+  });
+  $("d-body").innerHTML = html;
+  $("d-scroll").scrollTop = 0;
+  app.classList.add("detail-open");
 }
-$("back-btn").addEventListener("click", ()=>{
-  $("detail").classList.remove("show");
-  $("action-bar").classList.remove("show");
-  $("list-view").classList.remove("hide");
+$("btn-back").addEventListener("click", ()=>{
+  app.classList.remove("detail-open");
   currentStore = null;
 });
 
-/* ═══════════ 텍스트 복사 ═══════════ */
+/* ═══════════ 텍스트 복사 / 공유 ═══════════ */
 function buildText(store){
   const lines = [];
   lines.push(`■ ${store.name || "(상호명 없음)"} (스토어 ID: ${store.id})`);
@@ -352,7 +403,6 @@ function buildText(store){
     lines.push(store.intro);
     lines.push("");
   }
-  let n = 0;
   for(const g of store.groups){
     if(g.name || g.desc){
       lines.push(`[${g.name || "기타"}]`);
@@ -360,8 +410,7 @@ function buildText(store){
       lines.push("");
     }
     for(const m of g.menus){
-      n++;
-      lines.push(`${n}. ${m.name}`);
+      lines.push(m.name);
       if(m.desc) lines.push(m.desc);
       lines.push("");
     }
@@ -369,49 +418,62 @@ function buildText(store){
   return lines.join("\n").trim();
 }
 
-$("btn-copy").addEventListener("click", async ()=>{
-  if(!currentStore) return;
-  const text = buildText(currentStore);
+async function copyText(text){
   try{
     await navigator.clipboard.writeText(text);
-    toast("📋 전체 메뉴 설명이 복사되었습니다");
+    return true;
   }catch(e){
-    // 구형/제한 환경 폴백
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.style.cssText = "position:fixed;left:-9999px;top:0;";
     document.body.appendChild(ta);
     ta.select();
-    try{
-      document.execCommand("copy");
-      toast("📋 전체 메뉴 설명이 복사되었습니다");
-    }catch(e2){
-      toast("복사에 실패했습니다");
-    }
+    let ok = false;
+    try{ ok = document.execCommand("copy"); }catch(e2){}
     ta.remove();
+    return ok;
+  }
+}
+
+$("btn-copy").addEventListener("click", async ()=>{
+  if(!currentStore) return;
+  const ok = await copyText(buildText(currentStore));
+  toast(ok ? "전체 메뉴 설명이 복사됐어요" : "복사에 실패했습니다");
+});
+
+$("btn-share-top").addEventListener("click", async ()=>{
+  if(!currentStore) return;
+  const text = buildText(currentStore);
+  if(navigator.share){
+    try{ await navigator.share({ text }); }catch(e){ /* 취소 시 무시 */ }
+  }else{
+    const ok = await copyText(text);
+    toast(ok ? "공유 대신 텍스트를 복사했어요" : "복사에 실패했습니다");
   }
 });
 
-/* ═══════════ 이미지 생성 (캔버스 직접 렌더링) ═══════════
-   화면을 캡처하는 대신, 스토어 전체 내용을 캔버스에 직접 그려서
-   스크롤과 무관하게 전체가 담긴 세로로 긴 PNG를 만든다.
-   기기 캔버스 한계를 넘으면 메뉴 카드 경계에서 자동 분할. */
+/* ═══════════ 이미지 생성 (캔버스 직접 렌더링, 쿠팡이츠 스타일) ═══════════
+   스토어 전체 내용을 흰 배경 리스트 스타일로 그린다.
+   기기 캔버스 한계를 넘으면 블록 경계에서 자동 분할. */
 const IMG_W = 1080;
-const IMG_PAD = 56;
-const CARD_PAD = 40;
-const CARD_GAP = 24;
-const MAX_PAGE_H = 11000; // iOS 사파리 캔버스 면적 한계(약 1,678만px) 안쪽으로 유지
+const PAD = 64;
+const MAX_PAGE_H = 11000;
 
-const FONT_STACK = '-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
-const F_TITLE  = '800 46px ' + FONT_STACK;
-const F_SUB    = '400 27px ' + FONT_STACK;
-const F_MNAME  = '700 34px ' + FONT_STACK;
-const F_MDESC  = '400 29px ' + FONT_STACK;
-const F_GNAME  = '800 38px ' + FONT_STACK;
-const F_GDESC  = '400 27px ' + FONT_STACK;
-const F_ITAG   = '800 24px ' + FONT_STACK;
-const F_FOOT   = '400 23px ' + FONT_STACK;
-const LH_MNAME = 48, LH_MDESC = 46, LH_GNAME = 52, LH_GDESC = 40;
+const FONT_STACK = '"Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const F_TITLE = '800 50px ' + FONT_STACK;
+const F_META  = '400 27px ' + FONT_STACK;
+const F_ITAG  = '800 25px ' + FONT_STACK;
+const F_INTRO = '400 29px ' + FONT_STACK;
+const F_GNAME = '700 33px ' + FONT_STACK;
+const F_GCNT  = '700 26px ' + FONT_STACK;
+const F_GDESC = '400 27px ' + FONT_STACK;
+const F_MNAME = '700 33px ' + FONT_STACK;
+const F_MDESC = '400 28px ' + FONT_STACK;
+const F_FOOT  = '400 22px ' + FONT_STACK;
+const LH_TITLE=64, LH_INTRO=47, LH_GDESC=44, LH_MNAME=46, LH_MDESC=45;
+
+const C_INK="#212124", C_SUB="#8B95A1", C_BODY="#454C53", C_LINE="#F2F3F5",
+      C_BAND="#F7F8FA", C_BLUE="#00A8F0", C_ORANGE="#FF6F0F", C_FAINT="#B0B8C1";
 
 function wrapText(ctx, text, font, maxW){
   ctx.font = font;
@@ -421,12 +483,8 @@ function wrapText(ctx, text, font, maxW){
     let line = "";
     for(const word of para.split(" ")){
       const tryLine = line ? line + " " + word : word;
-      if(ctx.measureText(tryLine).width <= maxW){
-        line = tryLine;
-        continue;
-      }
+      if(ctx.measureText(tryLine).width <= maxW){ line = tryLine; continue; }
       if(line) out.push(line);
-      // 단어 하나가 폭을 넘으면(긴 한글 문장 등) 글자 단위로 쪼갬
       if(ctx.measureText(word).width > maxW){
         let chunk = "";
         for(const ch of word){
@@ -443,167 +501,149 @@ function wrapText(ctx, text, font, maxW){
   return out;
 }
 
-function roundRect(ctx, x, y, w, h, r){
-  ctx.beginPath();
-  ctx.moveTo(x+r, y);
-  ctx.arcTo(x+w, y, x+w, y+h, r);
-  ctx.arcTo(x+w, y+h, x, y+h, r);
-  ctx.arcTo(x, y+h, x, y, r);
-  ctx.arcTo(x, y, x+w, y, r);
-  ctx.closePath();
-}
-
 function buildImagePages(store){
   const measure = document.createElement("canvas").getContext("2d");
-  const innerW = IMG_W - IMG_PAD*2;
-  const cardInnerW = innerW - CARD_PAD*2;
-  const maxCardH = MAX_PAGE_H - IMG_PAD*2 - 200;
+  const innerW = IMG_W - PAD*2;
+  const maxBlockH = MAX_PAGE_H - PAD*2 - 240;
 
-  // 소개/그룹/메뉴를 순서대로 블록으로 변환
+  // ── 블록 구성 (소개 / 그룹밴드 / 그룹설명 / 메뉴) ──
   const blocks = [];
-
   if(store.intro){
-    const lines = wrapText(measure, store.intro, F_MDESC, cardInnerW);
-    blocks.push({ kind:"intro", lines, h: CARD_PAD*2 + 34 + lines.length*LH_MDESC });
+    const lines = wrapText(measure, store.intro, F_INTRO, innerW);
+    blocks.push({ kind:"intro", lines, h: 30 + 40 + lines.length*LH_INTRO + 30 + 14 });
   }
-
-  let n = 0;
   for(const g of store.groups){
     if(g.name || g.desc){
-      const nameLines = wrapText(measure, g.name || "기타", F_GNAME, innerW);
-      const descLines = g.desc ? wrapText(measure, g.desc, F_GDESC, innerW) : [];
-      blocks.push({ kind:"ghead", nameLines, descLines,
-        h: 20 + nameLines.length*LH_GNAME + (descLines.length ? 6 + descLines.length*LH_GDESC : 0) + 18 });
+      blocks.push({ kind:"gband", name: g.name || "기타", count: g.menus.length, h: 88 });
+      if(g.desc){
+        const lines = wrapText(measure, g.desc, F_GDESC, innerW);
+        blocks.push({ kind:"gdesc", lines, h: 24 + lines.length*LH_GDESC + 24 });
+      }
     }
     for(const m of g.menus){
-      n++;
-      const nameLines = wrapText(measure, `${n}. ${m.name}`, F_MNAME, cardInnerW);
-      const descLines = m.desc ? wrapText(measure, m.desc, F_MDESC, cardInnerW) : [];
+      const nameLines = wrapText(measure, m.name, F_MNAME, innerW);
+      const descLines = m.desc ? wrapText(measure, m.desc, F_MDESC, innerW) : [];
       const makeBlock = (nl, dl, cont)=>({
         kind:"menu", nameLines: nl, descLines: dl, cont,
-        h: CARD_PAD*2 + nl.length*LH_MNAME + (dl.length ? 14 + dl.length*LH_MDESC : 0),
+        h: 32 + nl.length*LH_MNAME + (dl.length ? 10 + dl.length*LH_MDESC : 0) + 32,
       });
       const block = makeBlock(nameLines, descLines, false);
-      if(block.h <= maxCardH){
+      if(block.h <= maxBlockH){
         blocks.push(block);
       }else{
-        // 카드 하나가 페이지보다 크면 설명 줄을 나눠 '(이어서)' 카드로 분할
-        const headH = CARD_PAD*2 + nameLines.length*LH_MNAME + 14;
-        const perPage = Math.max(5, Math.floor((maxCardH - headH) / LH_MDESC));
+        const headH = 32 + nameLines.length*LH_MNAME + 10;
+        const perPage = Math.max(5, Math.floor((maxBlockH - headH) / LH_MDESC));
         for(let s=0; s<descLines.length; s+=perPage){
           blocks.push(makeBlock(
-            s===0 ? nameLines : wrapText(measure, `${n}. ${m.name} (이어서)`, F_MNAME, cardInnerW),
+            s===0 ? nameLines : wrapText(measure, m.name + " (이어서)", F_MNAME, innerW),
             descLines.slice(s, s+perPage), s>0));
         }
       }
     }
   }
 
-  // 헤더 높이 계산
+  // ── 페이지 배분 ──
   const titleLines = wrapText(measure, store.name || "(상호명 없음)", F_TITLE, innerW);
-  const headerH = titleLines.length*62 + 44 + 30; // 제목 + 부제 + 여백
-  const FOOT_H = 70;
+  const headerH = titleLines.length*LH_TITLE + 14 + 34 + 28 + 2 + 8;
+  const FOOT_H = 76;
 
-  // 페이지 배분: 카드 경계에서 끊음
   const pages = [];
-  let cur = [], curH = IMG_PAD + headerH + 24;
+  let cur = [], curH = PAD + headerH;
   for(const b of blocks){
-    if(cur.length && curH + b.h + CARD_GAP > MAX_PAGE_H - IMG_PAD - FOOT_H){
-      pages.push(cur);
-      cur = [];
-      curH = IMG_PAD + headerH + 24;
+    if(cur.length && curH + b.h > MAX_PAGE_H - PAD - FOOT_H){
+      pages.push(cur); cur = []; curH = PAD + headerH;
     }
-    cur.push(b);
-    curH += b.h + CARD_GAP;
+    cur.push(b); curH += b.h;
   }
   if(cur.length) pages.push(cur);
   if(pages.length === 0) pages.push([]);
 
-  // 각 페이지 렌더링
+  // ── 렌더링 ──
   const now = new Date();
   const stamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+  const totalMenus = menuCount(store);
+
   return pages.map((pageBlocks, pi)=>{
-    const contentH = pageBlocks.reduce((a,b)=>a + b.h + CARD_GAP, 0);
-    const H = IMG_PAD + headerH + 24 + contentH + FOOT_H + IMG_PAD;
+    const contentH = pageBlocks.reduce((a,b)=>a + b.h, 0);
+    const H = PAD + headerH + contentH + FOOT_H + PAD;
     const canvas = document.createElement("canvas");
     canvas.width = IMG_W;
     canvas.height = H;
     const ctx = canvas.getContext("2d");
 
-    ctx.fillStyle = "#F7F6F3";
+    ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, IMG_W, H);
     ctx.textBaseline = "top";
 
     // 헤더
-    let y = IMG_PAD;
-    ctx.fillStyle = "#37352F";
+    let y = PAD;
+    ctx.fillStyle = C_INK;
     ctx.font = F_TITLE;
-    for(const ln of titleLines){ ctx.fillText(ln, IMG_PAD, y); y += 62; }
-    ctx.fillStyle = "#787774";
-    ctx.font = F_SUB;
-    const subParts = [`스토어 ID ${store.id}`, `메뉴 ${menuCount(store)}개`];
-    if(store.updatedAt) subParts.push(`업데이트 ${store.updatedAt.slice(0,10)}`);
-    if(pages.length > 1) subParts.push(`${pi+1} / ${pages.length} 페이지`);
-    ctx.fillText(subParts.join("  ·  "), IMG_PAD, y + 6);
-    y += 44;
-    ctx.strokeStyle = "#EAE9E5";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(IMG_PAD, y+16); ctx.lineTo(IMG_W-IMG_PAD, y+16); ctx.stroke();
-    y += 30 + 24;
+    for(const ln of titleLines){ ctx.fillText(ln, PAD, y); y += LH_TITLE; }
+    y += 14;
+    ctx.fillStyle = C_SUB;
+    ctx.font = F_META;
+    const meta = [`스토어 ID ${store.id}`, `메뉴 ${totalMenus}개`];
+    if(store.updatedAt) meta.push(`업데이트 ${store.updatedAt.slice(0,10)}`);
+    if(pages.length > 1) meta.push(`${pi+1}/${pages.length} 페이지`);
+    ctx.fillText(meta.join("  ·  "), PAD, y);
+    y += 34 + 28;
+    ctx.fillStyle = C_LINE;
+    ctx.fillRect(PAD, y, innerW, 2);
+    y += 2 + 8;
 
-    // 블록 렌더링 (소개 카드 / 그룹 헤더 / 메뉴 카드)
+    // 블록
     for(const b of pageBlocks){
       if(b.kind === "intro"){
-        ctx.fillStyle = "#E7F1FB";
-        roundRect(ctx, IMG_PAD, y, innerW, b.h, 18);
-        ctx.fill();
-        let ty = y + CARD_PAD;
-        ctx.fillStyle = "#2383E2";
+        let ty = y + 30;
+        ctx.fillStyle = C_BLUE;
         ctx.font = F_ITAG;
-        ctx.fillText("매장 소개", IMG_PAD + CARD_PAD, ty);
-        ty += 34;
-        ctx.fillStyle = "#37352F";
-        ctx.font = F_MDESC;
-        for(const ln of b.lines){ ctx.fillText(ln, IMG_PAD + CARD_PAD, ty); ty += LH_MDESC; }
-      }else if(b.kind === "ghead"){
-        let ty = y + 20;
-        ctx.fillStyle = "#37352F";
+        ctx.fillText("매장 소개", PAD, ty);
+        ty += 40;
+        ctx.fillStyle = C_BODY;
+        ctx.font = F_INTRO;
+        for(const ln of b.lines){ ctx.fillText(ln, PAD, ty); ty += LH_INTRO; }
+        ctx.fillStyle = C_BAND;
+        ctx.fillRect(0, y + b.h - 14, IMG_W, 14);
+      }else if(b.kind === "gband"){
+        ctx.fillStyle = C_BAND;
+        ctx.fillRect(0, y, IMG_W, b.h);
+        ctx.fillStyle = C_INK;
         ctx.font = F_GNAME;
-        for(const ln of b.nameLines){ ctx.fillText(ln, IMG_PAD, ty); ty += LH_GNAME; }
-        if(b.descLines.length){
-          ty += 6;
-          ctx.fillStyle = "#787774";
-          ctx.font = F_GDESC;
-          for(const ln of b.descLines){ ctx.fillText(ln, IMG_PAD, ty); ty += LH_GDESC; }
-        }
-        ctx.strokeStyle = "#E3E2DD";
-        ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(IMG_PAD, y + b.h - 4); ctx.lineTo(IMG_W - IMG_PAD, y + b.h - 4); ctx.stroke();
-      }else{
-        ctx.fillStyle = "#FFFFFF";
-        ctx.strokeStyle = "#EAE9E5";
-        ctx.lineWidth = 2;
-        roundRect(ctx, IMG_PAD, y, innerW, b.h, 18);
-        ctx.fill(); ctx.stroke();
-
-        let ty = y + CARD_PAD;
-        ctx.fillStyle = b.cont ? "#9B9A97" : "#37352F";
+        ctx.fillText(b.name, PAD, y + 28);
+        ctx.fillStyle = C_ORANGE;
+        ctx.font = F_GCNT;
+        ctx.textAlign = "right";
+        ctx.fillText(`메뉴 ${b.count}개`, IMG_W - PAD, y + 32);
+        ctx.textAlign = "left";
+      }else if(b.kind === "gdesc"){
+        let ty = y + 24;
+        ctx.fillStyle = C_SUB;
+        ctx.font = F_GDESC;
+        for(const ln of b.lines){ ctx.fillText(ln, PAD, ty); ty += LH_GDESC; }
+        ctx.fillStyle = C_LINE;
+        ctx.fillRect(PAD, y + b.h - 2, innerW, 2);
+      }else{ // menu
+        let ty = y + 32;
+        ctx.fillStyle = b.cont ? C_SUB : C_INK;
         ctx.font = F_MNAME;
-        for(const ln of b.nameLines){ ctx.fillText(ln, IMG_PAD + CARD_PAD, ty); ty += LH_MNAME; }
+        for(const ln of b.nameLines){ ctx.fillText(ln, PAD, ty); ty += LH_MNAME; }
         if(b.descLines.length){
-          ty += 14;
-          ctx.fillStyle = "#57564F";
+          ty += 10;
+          ctx.fillStyle = C_SUB;
           ctx.font = F_MDESC;
-          for(const ln of b.descLines){ ctx.fillText(ln, IMG_PAD + CARD_PAD, ty); ty += LH_MDESC; }
+          for(const ln of b.descLines){ ctx.fillText(ln, PAD, ty); ty += LH_MDESC; }
         }
+        ctx.fillStyle = C_LINE;
+        ctx.fillRect(PAD, y + b.h - 2, innerW, 2);
       }
-      y += b.h + CARD_GAP;
+      y += b.h;
     }
 
     // 푸터
-    ctx.fillStyle = "#9B9A97";
+    ctx.fillStyle = C_FAINT;
     ctx.font = F_FOOT;
-    ctx.fillText(`생성 ${stamp} · 쿠팡이츠 메뉴 설명`, IMG_PAD, H - IMG_PAD - 26);
+    ctx.fillText(`생성 ${stamp} · 쿠팡이츠 메뉴 설명`, PAD, H - PAD - 26);
 
     return canvas;
   });
@@ -623,6 +663,15 @@ $("btn-img").addEventListener("click", async ()=>{
   if(!currentStore) return;
   busy(true, "이미지 생성 중…");
   try{
+    // 캔버스가 Pretendard로 그려지도록 폰트 로드를 보장
+    try{
+      await Promise.all([
+        document.fonts.load('400 28px Pretendard', "한글Aa1"),
+        document.fonts.load('700 33px Pretendard', "한글Aa1"),
+        document.fonts.load('800 50px Pretendard', "한글Aa1"),
+      ]);
+    }catch(e){ /* 폰트 로드 실패 시 시스템 폰트로 대체 */ }
+
     const canvases = buildImagePages(currentStore);
     const base = safeFileName(currentStore.name || currentStore.id);
     const files = [];
@@ -633,7 +682,7 @@ $("btn-img").addEventListener("click", async ()=>{
         : `${base}_메뉴설명.png`;
       files.push({ blob, name, url: URL.createObjectURL(blob) });
     }
-    showImageModal(files);
+    showImageSheet(files);
   }catch(e){
     toast("이미지 생성 실패: " + (e.message || e));
   }finally{
@@ -641,7 +690,7 @@ $("btn-img").addEventListener("click", async ()=>{
   }
 });
 
-function showImageModal(files){
+function showImageSheet(files){
   objectUrls.forEach(u=>URL.revokeObjectURL(u));
   objectUrls = files.map(f=>f.url);
 
@@ -649,14 +698,15 @@ function showImageModal(files){
   const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [new File([files[0].blob], files[0].name, { type: "image/png" })] }));
 
   $("modal-body").innerHTML =
-    `<div class="modal-tip">💡 [저장]이 동작하지 않으면 이미지를 <b>길게 눌러</b> '사진에 저장'을 선택하세요.${files.length>1 ? "<br>내용이 길어 " + files.length + "장으로 나눠 생성했습니다." : ""}</div>` +
+    `<div class="sheet-tip">💡 [저장]이 동작하지 않으면 이미지를 <b>길게 눌러</b> '사진에 저장'을 선택하세요.${
+      files.length>1 ? "<br>내용이 길어 " + files.length + "장으로 나눠 생성했어요." : ""}</div>` +
     files.map((f,i)=>`
       <div class="img-page">
         ${files.length>1 ? `<div class="pg-label">${i+1} / ${files.length}</div>` : ""}
         <img src="${f.url}" alt="메뉴 설명 이미지 ${i+1}">
         <div class="pg-btns">
-          <button class="pg-dl" data-i="${i}">⬇️ 저장</button>
-          ${canShareFiles ? `<button class="pg-share" data-i="${i}">↗️ 공유</button>` : ""}
+          <button class="pg-dl" data-i="${i}">저장</button>
+          ${canShareFiles ? `<button class="pg-share" data-i="${i}">공유</button>` : ""}
         </div>
       </div>`).join("");
 
@@ -669,7 +719,7 @@ function showImageModal(files){
       document.body.appendChild(a);
       a.click();
       a.remove();
-      toast("⬇️ 저장을 시작했습니다");
+      toast("저장을 시작했어요");
     });
   });
   $("modal-body").querySelectorAll(".pg-share").forEach(btn=>{
@@ -682,9 +732,15 @@ function showImageModal(files){
   });
 
   $("img-modal").classList.add("show");
+  app.classList.add("sheet-open");
+  $("modal-body").scrollTop = 0;
 }
-$("modal-close").addEventListener("click", ()=>$("img-modal").classList.remove("show"));
-$("img-modal").addEventListener("click", (e)=>{ if(e.target === $("img-modal")) $("img-modal").classList.remove("show"); });
+function closeSheet(){
+  $("img-modal").classList.remove("show");
+  app.classList.remove("sheet-open");
+}
+$("modal-close").addEventListener("click", closeSheet);
+$("sheet-dim").addEventListener("click", closeSheet);
 
 /* ═══════════ 시작 ═══════════ */
 (async function init(){
