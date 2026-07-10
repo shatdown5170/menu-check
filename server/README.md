@@ -36,8 +36,22 @@
 ## 메뉴 설명 열람/업로드 기능 설정 (최초 1회)
 
 `menu-desc.html`(세일즈 열람) / `menu-desc-admin.html`(관리자 업로드)이 사용하는
-데이터 저장소는 **개인 구글 시트**이고, 서버가 **서비스 계정**으로 대신 읽고 쓴다.
+데이터 저장소는 **구글 시트**이고, 서버가 **서비스 계정**으로 대신 읽고 쓴다.
 업로드하는 팀원과 세일즈는 구글 로그인이 전혀 필요 없다.
+
+### 🚀 빠른 설정 (권장): 자동 스크립트
+
+[Google Cloud Shell](https://shell.cloud.google.com)에서 menu-check가 있는 프로젝트를 선택한 뒤 한 줄 실행:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/shatdown5170/menu-check/main/server/setup-menu-desc.sh)
+```
+
+비밀번호 2개(열람용/관리자용)와 시트를 공유받을 개인 이메일만 입력하면
+API 활성화 → 서비스 계정 생성 → 시트 생성·공유 → Cloud Run 환경변수 설정 → 동작 확인까지 자동으로 끝난다.
+아래 수동 절차는 스크립트를 쓸 수 없을 때만 참고.
+
+### 수동 설정 절차
 
 ### 1. 서비스 계정 만들기 (Cloud Run과 같은 GCP 프로젝트)
 1. https://console.cloud.google.com/iam-admin/serviceaccounts → **서비스 계정 만들기**
