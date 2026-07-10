@@ -3,7 +3,15 @@
 //   요청  POST /  JSON { mode:'vision', images:[base64...], mediaTypes:['image/jpeg'...] }
 //   응답  200    JSON { menu: { groups:[ { name, note, dishes:[ { name, price, priceNote, amount, serves, components[], category } ] } ] } }
 //   오류         JSON { error: "..." }
+//
+// ── 메뉴 설명 열람/업로드 API (menu-desc.html / menu-desc-admin.html) ──
+//   GET  /menu-desc/ping    헤더 x-access-key             → { ok, role:'view'|'admin' }
+//   GET  /menu-desc/data    헤더 x-access-key             → { stores:[{id,name,updatedAt,menus:[{name,desc}]}] }
+//   POST /menu-desc/upload  헤더 x-access-key(관리자만)    → body { rows:[{storeId,storeName,menuName,desc}] }
+//                           업로드에 포함된 스토어는 통째로 교체, 나머지는 유지.
+//   저장소: Google Sheet (서비스 계정으로 읽기/쓰기)
 import express from "express";
+import crypto from "node:crypto";
 
 const app = express();
 
@@ -14,7 +22,7 @@ app.use(express.json({ limit: "30mb" }));
 app.use((req, res, next) => {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
+  res.set("Access-Control-Allow-Headers", "Content-Type, x-access-key");
   res.set("Access-Control-Max-Age", "86400");
   if (req.method === "OPTIONS") return res.status(204).end();
   next();
@@ -168,6 +176,218 @@ app.post("/", async (req, res) => {
   } catch (e) {
     console.error("handler error:", e);
     return res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 메뉴 설명 열람/업로드 API
+// ════════════════════════════════════════════════════════════════════
+
+const MENU_DESC_SHEET_ID = process.env.MENU_DESC_SHEET_ID; // 구글 시트 URL의 /d/{이 부분}/
+const MENU_DESC_SHEET_NAME = process.env.MENU_DESC_SHEET_NAME || "메뉴설명";
+const MENU_DESC_VIEW_KEY = process.env.MENU_DESC_VIEW_KEY;   // 세일즈 열람용 비밀번호
+const MENU_DESC_ADMIN_KEY = process.env.MENU_DESC_ADMIN_KEY; // 업로드(관리자)용 비밀번호
+
+// 시트 컬럼: A 스토어ID | B 스토어명 | C 메뉴명 | D 메뉴설명 | E 업로드일시
+const SHEET_HEADER = ["스토어ID", "스토어명", "메뉴명", "메뉴설명", "업로드일시"];
+
+// ── 서비스 계정 JWT → 액세스 토큰 (라이브러리 없이 직접 서명, 만료 전까지 캐시) ──
+let cachedToken = null; // { token, exp }
+
+function b64url(input) {
+  return Buffer.from(input).toString("base64url");
+}
+
+function getServiceAccount() {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error("서버에 GOOGLE_SERVICE_ACCOUNT_JSON이 설정되지 않았습니다.");
+  const sa = JSON.parse(raw);
+  // 환경변수에 \n 이 문자 그대로 들어간 경우 복원
+  if (sa.private_key && !sa.private_key.includes("\n")) {
+    sa.private_key = sa.private_key.replace(/\\n/g, "\n");
+  }
+  return sa;
+}
+
+async function getAccessToken() {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedToken && cachedToken.exp - 60 > now) return cachedToken.token;
+
+  const sa = getServiceAccount();
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claims = b64url(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/spreadsheets",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  }));
+  const unsigned = `${header}.${claims}`;
+  const signature = crypto.sign("RSA-SHA256", Buffer.from(unsigned), sa.private_key).toString("base64url");
+  const jwt = `${unsigned}.${signature}`;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.access_token) {
+    throw new Error(`구글 인증 실패: ${data.error_description || data.error || res.status}`);
+  }
+  cachedToken = { token: data.access_token, exp: now + (data.expires_in || 3600) };
+  return cachedToken.token;
+}
+
+async function sheetsApi(path, options = {}) {
+  const token = await getAccessToken();
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${MENU_DESC_SHEET_ID}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(`Sheets API 오류 (${res.status}): ${data?.error?.message || "알 수 없는 오류"}`);
+  }
+  return data;
+}
+
+// 시트 탭이 없으면 만들고 헤더를 기록
+async function ensureSheetTab() {
+  const meta = await sheetsApi("?fields=sheets.properties.title");
+  const titles = (meta.sheets || []).map((s) => s.properties.title);
+  if (titles.includes(MENU_DESC_SHEET_NAME)) return;
+  await sheetsApi(":batchUpdate", {
+    method: "POST",
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title: MENU_DESC_SHEET_NAME } } }] }),
+  });
+  await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A1:E1?valueInputOption=RAW`, {
+    method: "PUT",
+    body: JSON.stringify({ values: [SHEET_HEADER] }),
+  });
+}
+
+// 시트 전체 읽기 → 행 배열 [{storeId,storeName,menuName,desc,updatedAt}]
+async function readAllRows() {
+  await ensureSheetTab();
+  const data = await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A:E`);
+  const values = data.values || [];
+  const rows = [];
+  for (let i = 0; i < values.length; i++) {
+    const [storeId, storeName, menuName, desc, updatedAt] = values[i].map((v) => String(v ?? "").trim());
+    if (!storeId || storeId === SHEET_HEADER[0]) continue; // 헤더/빈 행 제외
+    rows.push({ storeId, storeName: storeName || "", menuName: menuName || "", desc: desc || "", updatedAt: updatedAt || "" });
+  }
+  return rows;
+}
+
+// 시트 전체 다시 쓰기 (헤더 + 행)
+async function writeAllRows(rows) {
+  await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A:E:clear`, { method: "POST", body: "{}" });
+  const values = [SHEET_HEADER, ...rows.map((r) => [r.storeId, r.storeName, r.menuName, r.desc, r.updatedAt])];
+  await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A1?valueInputOption=RAW`, {
+    method: "PUT",
+    body: JSON.stringify({ values }),
+  });
+}
+
+// ── 접근 키 확인: 'admin' | 'view' | null ──
+function roleOf(req) {
+  const key = req.get("x-access-key") || "";
+  if (!key) return null;
+  if (MENU_DESC_ADMIN_KEY && key === MENU_DESC_ADMIN_KEY) return "admin";
+  if (MENU_DESC_VIEW_KEY && key === MENU_DESC_VIEW_KEY) return "view";
+  return null;
+}
+
+function requireConfig(res) {
+  if (!MENU_DESC_SHEET_ID) {
+    res.status(500).json({ error: "서버에 MENU_DESC_SHEET_ID가 설정되지 않았습니다." });
+    return false;
+  }
+  if (!MENU_DESC_VIEW_KEY || !MENU_DESC_ADMIN_KEY) {
+    res.status(500).json({ error: "서버에 MENU_DESC_VIEW_KEY / MENU_DESC_ADMIN_KEY가 설정되지 않았습니다." });
+    return false;
+  }
+  return true;
+}
+
+// 비밀번호 확인 (로그인 화면용)
+app.get("/menu-desc/ping", (req, res) => {
+  if (!requireConfig(res)) return;
+  const role = roleOf(req);
+  if (!role) return res.status(401).json({ error: "비밀번호가 올바르지 않습니다." });
+  res.json({ ok: true, role });
+});
+
+// 전체 데이터 조회 (스토어별 그룹)
+app.get("/menu-desc/data", async (req, res) => {
+  try {
+    if (!requireConfig(res)) return;
+    if (!roleOf(req)) return res.status(401).json({ error: "비밀번호가 올바르지 않습니다." });
+
+    const rows = await readAllRows();
+    const byStore = new Map();
+    for (const r of rows) {
+      if (!byStore.has(r.storeId)) {
+        byStore.set(r.storeId, { id: r.storeId, name: r.storeName, updatedAt: r.updatedAt, menus: [] });
+      }
+      const s = byStore.get(r.storeId);
+      if (r.storeName) s.name = r.storeName;
+      if (r.updatedAt > s.updatedAt) s.updatedAt = r.updatedAt;
+      s.menus.push({ name: r.menuName, desc: r.desc });
+    }
+    res.json({ stores: [...byStore.values()] });
+  } catch (e) {
+    console.error("menu-desc/data error:", e);
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
+// 데이터 업로드 — 업로드에 포함된 스토어는 교체, 나머지는 유지
+app.post("/menu-desc/upload", async (req, res) => {
+  try {
+    if (!requireConfig(res)) return;
+    if (roleOf(req) !== "admin") return res.status(401).json({ error: "관리자 비밀번호가 올바르지 않습니다." });
+
+    const incoming = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    const cleaned = incoming
+      .map((r) => ({
+        storeId: String(r.storeId ?? "").trim(),
+        storeName: String(r.storeName ?? "").trim(),
+        menuName: String(r.menuName ?? "").trim(),
+        desc: String(r.desc ?? "").trim(),
+      }))
+      .filter((r) => r.storeId && r.menuName);
+    if (cleaned.length === 0) {
+      return res.status(400).json({ error: "업로드할 유효한 행이 없습니다. (스토어ID와 메뉴명은 필수)" });
+    }
+
+    const now = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }); // YYYY-MM-DD HH:mm:ss
+    const uploadedIds = new Set(cleaned.map((r) => r.storeId));
+
+    const existing = await readAllRows();
+    const kept = existing.filter((r) => !uploadedIds.has(r.storeId));
+    const merged = [...kept, ...cleaned.map((r) => ({ ...r, updatedAt: now }))];
+    await writeAllRows(merged);
+
+    res.json({
+      ok: true,
+      uploadedStores: uploadedIds.size,
+      uploadedRows: cleaned.length,
+      totalStores: new Set(merged.map((r) => r.storeId)).size,
+      totalRows: merged.length,
+    });
+  } catch (e) {
+    console.error("menu-desc/upload error:", e);
+    res.status(500).json({ error: String(e?.message || e) });
   }
 });
 

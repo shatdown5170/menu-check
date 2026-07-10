@@ -25,6 +25,58 @@
 | `GEMINI_API_KEY` | ✅ | Google AI Studio에서 발급한 Gemini API 키 |
 | `GEMINI_MODEL` | ❌ | 기본 `gemini-2.5-flash` |
 | `PORT` | ❌ | Cloud Run이 자동 주입 (기본 8080) |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | 메뉴설명 기능 사용 시 ✅ | 서비스 계정 키 JSON 전체 내용 (아래 설정 참고) |
+| `MENU_DESC_SHEET_ID` | 메뉴설명 기능 사용 시 ✅ | 데이터 저장용 구글 시트 ID (시트 URL의 `/d/`와 `/edit` 사이 값) |
+| `MENU_DESC_VIEW_KEY` | 메뉴설명 기능 사용 시 ✅ | 세일즈 열람용 비밀번호 (`menu-desc.html`) |
+| `MENU_DESC_ADMIN_KEY` | 메뉴설명 기능 사용 시 ✅ | 업로드 관리자용 비밀번호 (`menu-desc-admin.html`) |
+| `MENU_DESC_SHEET_NAME` | ❌ | 시트 탭 이름 (기본 `메뉴설명`, 없으면 자동 생성) |
+
+---
+
+## 메뉴 설명 열람/업로드 기능 설정 (최초 1회)
+
+`menu-desc.html`(세일즈 열람) / `menu-desc-admin.html`(관리자 업로드)이 사용하는
+데이터 저장소는 **개인 구글 시트**이고, 서버가 **서비스 계정**으로 대신 읽고 쓴다.
+업로드하는 팀원과 세일즈는 구글 로그인이 전혀 필요 없다.
+
+### 1. 서비스 계정 만들기 (Cloud Run과 같은 GCP 프로젝트)
+1. https://console.cloud.google.com/iam-admin/serviceaccounts → **서비스 계정 만들기**
+2. 이름 예: `menu-desc-sheets` → 역할은 부여하지 않아도 됨 → 완료
+3. 만든 계정 클릭 → **키** 탭 → **키 추가 → 새 키 만들기 → JSON** → 파일 다운로드
+4. 프로젝트에서 **Google Sheets API** 활성화:
+   https://console.cloud.google.com/apis/library/sheets.googleapis.com → 사용 설정
+
+### 2. 데이터 저장용 구글 시트 준비 (개인 계정)
+1. 개인 구글 계정으로 새 스프레드시트 생성 (이름 자유, 예: `쿠팡이츠 메뉴설명 DB`)
+2. **공유** → 1-3에서 받은 JSON 안의 `client_email` 값
+   (예: `menu-desc-sheets@프로젝트.iam.gserviceaccount.com`)을 **편집자**로 추가
+3. 시트 URL에서 ID 복사: `https://docs.google.com/spreadsheets/d/`**`{이부분}`**`/edit`
+4. 탭(시트지)은 만들 필요 없음 — 서버가 `메뉴설명` 탭과 헤더를 자동 생성
+
+### 3. Cloud Run 환경변수 추가
+Cloud Run 콘솔 → 서비스 → **수정 및 새 버전 배포** → 변수 및 보안 비밀:
+- `GOOGLE_SERVICE_ACCOUNT_JSON` = 다운로드한 JSON 파일의 **내용 전체**를 그대로 붙여넣기
+- `MENU_DESC_SHEET_ID` = 2-3의 시트 ID
+- `MENU_DESC_VIEW_KEY` = 세일즈에게 알려줄 열람 비밀번호
+- `MENU_DESC_ADMIN_KEY` = 업로드 담당자만 아는 관리자 비밀번호 (열람용과 다르게!)
+
+### 4. 확인
+```bash
+curl -H "x-access-key: 열람비밀번호" https://<Cloud Run URL>/menu-desc/ping
+# → {"ok":true,"role":"view"}
+curl -H "x-access-key: 열람비밀번호" https://<Cloud Run URL>/menu-desc/data
+# → {"stores":[]}   (첫 실행 시 시트에 '메뉴설명' 탭이 자동 생성됨)
+```
+
+### API 계약
+```
+GET  /menu-desc/ping    헤더 x-access-key                → { ok, role: 'view'|'admin' }
+GET  /menu-desc/data    헤더 x-access-key                → { stores:[{id,name,updatedAt,menus:[{name,desc}]}] }
+POST /menu-desc/upload  헤더 x-access-key (관리자 키만)   → body { rows:[{storeId,storeName,menuName,desc}] }
+                        업로드에 포함된 스토어ID는 기존 행 전체가 교체되고, 나머지 스토어는 유지.
+```
+
+시트 컬럼: `스토어ID | 스토어명 | 메뉴명 | 메뉴설명 | 업로드일시`
 
 ## 로컬 실행
 
