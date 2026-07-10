@@ -25,7 +25,7 @@
 | `GEMINI_API_KEY` | ✅ | Google AI Studio에서 발급한 Gemini API 키 |
 | `GEMINI_MODEL` | ❌ | 기본 `gemini-2.5-flash` |
 | `PORT` | ❌ | Cloud Run이 자동 주입 (기본 8080) |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | 메뉴설명 기능 사용 시 ✅ | 서비스 계정 키 JSON 전체 내용 (아래 설정 참고) |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | ❌ | 로컬 등 GCP 밖에서 실행할 때만. Cloud Run에서는 런타임 서비스 계정을 사용하므로 키 파일 불필요 |
 | `MENU_DESC_SHEET_ID` | 메뉴설명 기능 사용 시 ✅ | 데이터 저장용 구글 시트 ID (시트 URL의 `/d/`와 `/edit` 사이 값) |
 | `MENU_DESC_VIEW_KEY` | 메뉴설명 기능 사용 시 ✅ | 세일즈 열람용 비밀번호 (`menu-desc.html`) |
 | `MENU_DESC_ADMIN_KEY` | 메뉴설명 기능 사용 시 ✅ | 업로드 관리자용 비밀번호 (`menu-desc-admin.html`) |
@@ -53,25 +53,30 @@ API 활성화 → 서비스 계정 생성 → 시트 생성·공유 → Cloud Ru
 
 ### 수동 설정 절차
 
+> ⚠️ 참고: 최근 GCP는 보안 정책(`iam.disableServiceAccountKeyCreation`)으로
+> 서비스 계정 **키 파일 발급을 기본 차단**한다. 아래 수동 절차 대신
+> 키 없이 동작하는 위 자동 스크립트 사용을 권장.
+
 ### 1. 서비스 계정 만들기 (Cloud Run과 같은 GCP 프로젝트)
 1. https://console.cloud.google.com/iam-admin/serviceaccounts → **서비스 계정 만들기**
 2. 이름 예: `menu-desc-sheets` → 역할은 부여하지 않아도 됨 → 완료
-3. 만든 계정 클릭 → **키** 탭 → **키 추가 → 새 키 만들기 → JSON** → 파일 다운로드
+3. Cloud Run 서비스의 **런타임 서비스 계정**을 이 계정으로 변경
+   (Cloud Run 콘솔 → 서비스 수정 → 보안 탭). 서버는 이 신원으로 시트에 접근하므로 키 파일이 필요 없다.
+   (GCP 밖 로컬 실행 시에만 키 JSON을 만들어 `GOOGLE_SERVICE_ACCOUNT_JSON`에 넣는다)
 4. 프로젝트에서 **Google Sheets API** 활성화:
    https://console.cloud.google.com/apis/library/sheets.googleapis.com → 사용 설정
 
 ### 2. 데이터 저장용 구글 시트 준비 (개인 계정)
 1. 개인 구글 계정으로 새 스프레드시트 생성 (이름 자유, 예: `쿠팡이츠 메뉴설명 DB`)
-2. **공유** → 1-3에서 받은 JSON 안의 `client_email` 값
-   (예: `menu-desc-sheets@프로젝트.iam.gserviceaccount.com`)을 **편집자**로 추가
+2. **공유** → 서비스 계정 이메일
+   (예: `menu-desc-sheets@프로젝트ID.iam.gserviceaccount.com`)을 **편집자**로 추가
 3. 시트 URL에서 ID 복사: `https://docs.google.com/spreadsheets/d/`**`{이부분}`**`/edit`
 4. 탭(시트지)은 만들 필요 없음 — 서버가 `메뉴설명` 탭과 헤더를 자동 생성
 
 ### 3. Cloud Run 환경변수 추가
 Cloud Run 콘솔 → 서비스 → **수정 및 새 버전 배포** → 변수 및 보안 비밀:
-- `GOOGLE_SERVICE_ACCOUNT_JSON` = 다운로드한 JSON 파일의 **내용 전체**를 그대로 붙여넣기
 - `MENU_DESC_SHEET_ID` = 2-3의 시트 ID
-- `MENU_DESC_VIEW_KEY` = 세일즈에게 알려줄 열람 비밀번호
+- `MENU_DESC_VIEW_KEY` = 세일즈에게 알려줄 열람 비밀번호 (영문/숫자)
 - `MENU_DESC_ADMIN_KEY` = 업로드 담당자만 아는 관리자 비밀번호 (열람용과 다르게!)
 
 ### 4. 확인

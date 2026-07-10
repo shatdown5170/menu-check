@@ -3,10 +3,10 @@
 # 메뉴 설명 기능 — GCP 자동 설정 스크립트 (Google Cloud Shell에서 실행)
 #
 # 하는 일:
-#   1. Sheets/Drive API 활성화
-#   2. 서비스 계정 생성 + 키 발급
+#   1. Sheets/Drive/IAM Credentials API 활성화
+#   2. 서비스 계정 생성 (키 파일 없이 — 조직 정책과 무관하게 동작)
 #   3. 데이터 저장용 구글 시트 생성 + 내 개인 계정에 편집자로 자동 공유
-#   4. Cloud Run(menu-check)에 환경변수 설정 (기존 변수는 유지)
+#   4. Cloud Run(menu-check)을 이 서비스 계정으로 실행 + 환경변수 설정
 #   5. 동작 확인 (ping / data)
 #
 # 실행 방법:
@@ -65,34 +65,41 @@ read -rp "③ 시트를 공유받을 개인 구글 이메일 [shatdown112@gmail.
 SHARE_EMAIL=${SHARE_EMAIL:-shatdown112@gmail.com}
 
 echo ""
-echo "▶ 1/5 API 활성화 (Sheets, Drive)…"
-gcloud services enable sheets.googleapis.com drive.googleapis.com --quiet
+echo "▶ 1/5 API 활성화 (Sheets, Drive, IAM Credentials)…"
+gcloud services enable sheets.googleapis.com drive.googleapis.com iamcredentials.googleapis.com --quiet
 
-echo "▶ 2/5 서비스 계정 준비…"
+echo "▶ 2/5 서비스 계정 준비 (키 파일 없는 방식)…"
+# 구글 보안 정책(iam.disableServiceAccountKeyCreation)이 키 발급을 막는 환경이 많아
+# 키 파일을 만들지 않는다. 대신:
+#   · 시트 생성(1회)  → 일시적 가장(impersonation) 토큰 사용
+#   · 서버 운영(상시) → Cloud Run 런타임 서비스 계정 신원 사용
 SA_EMAIL="${SA_NAME}@${PROJECT}.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "$SA_EMAIL" >/dev/null 2>&1; then
   gcloud iam service-accounts create "$SA_NAME" --display-name="menu-desc 시트 접근용" --quiet
   sleep 3
 fi
-KEYFILE=$(mktemp)
-trap 'rm -f "$KEYFILE"' EXIT
-gcloud iam service-accounts keys create "$KEYFILE" --iam-account="$SA_EMAIL" --quiet
-KEY_JSON=$(python3 -c "import json,sys; print(json.dumps(json.load(open(sys.argv[1])), separators=(',',':')))" "$KEYFILE")
+USER_EMAIL=$(gcloud config get-value account 2>/dev/null)
+gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+  --member="user:${USER_EMAIL}" --role="roles/iam.serviceAccountTokenCreator" --quiet >/dev/null
 
-# 서비스 계정으로 Sheets/Drive API 토큰 발급
-python3 -c "import google.auth" 2>/dev/null || pip3 install --user --quiet google-auth
-TOKEN=$(python3 - "$KEYFILE" <<'PYEOF'
-import sys
-from google.oauth2 import service_account
-from google.auth.transport.requests import Request
-creds = service_account.Credentials.from_service_account_file(
-    sys.argv[1],
-    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"],
-)
-creds.refresh(Request())
-print(creds.token)
-PYEOF
-)
+get_sa_token() {
+  curl -sf -X POST "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SA_EMAIL}:generateAccessToken" \
+    -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+    -H "Content-Type: application/json" \
+    -d '{"scope":["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"],"lifetime":"600s"}' \
+    | python3 -c "import json,sys; print(json.load(sys.stdin)['accessToken'])"
+}
+echo "   권한 전파 대기 중 (보통 10~60초)…"
+TOKEN=""
+for i in $(seq 1 12); do
+  if TOKEN=$(get_sa_token 2>/dev/null) && [[ -n "$TOKEN" ]]; then break; fi
+  echo "   … 재시도 ($i/12)"
+  sleep 10
+done
+if [[ -z "$TOKEN" ]]; then
+  echo "❌ 서비스 계정 토큰 발급이 계속 실패합니다. 1~2분 뒤 스크립트를 다시 실행해보세요."
+  exit 1
+fi
 
 if [[ -z "${SHEET_ID:-}" ]]; then
   echo "▶ 3/5 구글 시트 생성 + ${SHARE_EMAIL} 에 편집자 공유…"
@@ -112,9 +119,10 @@ else
   echo "▶ 3/5 기존 시트 사용: $SHEET_ID (서비스 계정 ${SA_EMAIL} 이 편집자로 공유돼 있어야 함)"
 fi
 
-echo "▶ 4/5 Cloud Run 환경변수 설정 (새 리비전 배포, 1~2분)…"
+echo "▶ 4/5 Cloud Run 설정: 런타임 서비스 계정 지정 + 환경변수 (새 리비전 배포, 1~2분)…"
 gcloud run services update "$SERVICE" --region "$REGION" --quiet \
-  --update-env-vars "^@@@^GOOGLE_SERVICE_ACCOUNT_JSON=${KEY_JSON}@@@MENU_DESC_SHEET_ID=${SHEET_ID}@@@MENU_DESC_VIEW_KEY=${VIEW_KEY}@@@MENU_DESC_ADMIN_KEY=${ADMIN_KEY}"
+  --service-account "$SA_EMAIL" \
+  --update-env-vars "^@@@^MENU_DESC_SHEET_ID=${SHEET_ID}@@@MENU_DESC_VIEW_KEY=${VIEW_KEY}@@@MENU_DESC_ADMIN_KEY=${ADMIN_KEY}"
 
 echo "▶ 5/5 동작 확인…"
 URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
