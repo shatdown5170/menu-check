@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light">
+<title>메뉴 설명 업로드 (관리자)</title>
+<style>
+  :root{
+    color-scheme: light only;
+    --ink:#37352F; --gray:#9B9A97; --gray2:#787774;
+    --line:#EAE9E5; --line2:#EDEDEC; --bg:#F7F6F3; --card:#FFFFFF; --hover:#EFEEEA;
+    --pill:#EDECE8; --pill-on:#E3E2DD;
+    --blue:#2383E2; --blue-soft:#E7F1FB;
+    --green-bg:#DBEDDB; --green-fg:#448361;
+    --red-bg:#FBE4E4; --red-fg:#D44C47;
+    --org-bg:#FAEBDD; --org-fg:#D9730D;
+    --radius:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    html,body{background:#F7F6F3 !important;color:#37352F !important;}
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Pretendard",Roboto,"Malgun Gothic",sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  body{line-height:1.5;max-width:760px;margin:0 auto;padding-bottom:80px;}
+
+  .top{padding:22px 20px 14px;}
+  .top h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;}
+  .top p{margin:4px 0 0;font-size:13.5px;color:var(--gray);}
+  .wrap{padding:0 20px;}
+
+  #gate{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px;}
+  #gate.show{display:flex;}
+  .gate-box{width:100%;max-width:340px;text-align:center;}
+  .gate-box .emoji{font-size:44px;}
+  .gate-box h2{margin:12px 0 4px;font-size:20px;font-weight:800;}
+  .gate-box p{margin:0 0 20px;font-size:14px;color:var(--gray2);}
+  .gate-box input{width:100%;padding:14px 16px;font-size:17px;border:1.5px solid var(--line);border-radius:var(--radius);
+    background:var(--card);text-align:center;letter-spacing:2px;outline:none;}
+  .gate-box input:focus{border-color:var(--blue);}
+  .gate-box button{width:100%;margin-top:12px;padding:14px;font-size:16px;font-weight:700;color:#fff;background:var(--ink);
+    border:none;border-radius:var(--radius);cursor:pointer;}
+  .gate-err{margin-top:10px;font-size:13.5px;color:#D9730D;min-height:20px;}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
+  .card h3{margin:0 0 10px;font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:6px;}
+  .card .hint{font-size:13px;color:var(--gray2);margin-bottom:12px;}
+  .card .hint code{background:var(--pill);border-radius:4px;padding:1px 6px;font-size:12px;}
+
+  #status-line{font-size:13.5px;color:var(--gray2);}
+  #status-line b{color:var(--ink);}
+
+  textarea{width:100%;min-height:170px;padding:12px 14px;font-size:13.5px;border:1.5px solid var(--line);border-radius:10px;
+    background:#FDFDFC;outline:none;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.6;}
+  textarea:focus{border-color:var(--blue);}
+  .or{display:flex;align-items:center;gap:10px;color:var(--gray);font-size:12.5px;margin:12px 0;}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line);}
+  .file-row{display:flex;align-items:center;gap:10px;}
+  .file-btn{display:inline-block;background:var(--pill);border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:700;
+    color:var(--ink);cursor:pointer;}
+  #file-name{font-size:13px;color:var(--gray2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  input[type=file]{display:none;}
+
+  .btn-primary{width:100%;padding:15px;font-size:16px;font-weight:800;color:#fff;background:var(--ink);border:none;border-radius:var(--radius);cursor:pointer;}
+  .btn-primary:disabled{opacity:.4;cursor:default;}
+  .btn-ghost{width:100%;padding:12px;font-size:14px;font-weight:700;color:var(--gray2);background:var(--pill);border:none;border-radius:var(--radius);cursor:pointer;margin-top:8px;}
+
+  .stats{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  .stat{flex:1;min-width:100px;background:var(--pill);border-radius:10px;padding:10px 12px;text-align:center;}
+  .stat .v{font-size:20px;font-weight:800;}
+  .stat .k{font-size:11.5px;color:var(--gray2);}
+
+  .warn{background:var(--org-bg);color:var(--org-fg);font-size:13px;border-radius:10px;padding:11px 13px;margin-bottom:12px;line-height:1.55;}
+  .errbox{background:var(--red-bg);color:var(--red-fg);font-size:12.5px;border-radius:10px;padding:11px 13px;margin-bottom:12px;max-height:130px;overflow-y:auto;line-height:1.6;}
+  .okbox{background:var(--green-bg);color:var(--green-fg);font-size:13.5px;border-radius:10px;padding:12px 14px;margin-bottom:12px;line-height:1.6;}
+
+  .tbl-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-bottom:12px;}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:560px;}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line2);text-align:left;vertical-align:top;}
+  th{background:var(--pill);font-weight:700;white-space:nowrap;position:sticky;top:0;}
+  td.desc-cell{max-width:280px;}
+  tr:last-child td{border-bottom:none;}
+
+  #toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);z-index:200;
+    background:var(--ink);color:#fff;font-size:14px;font-weight:600;padding:11px 20px;border-radius:99px;
+    opacity:0;pointer-events:none;transition:.25s;white-space:nowrap;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #busy{position:fixed;inset:0;z-index:180;background:rgba(247,246,243,.75);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+  #busy.show{display:flex;}
+  .spinner{width:34px;height:34px;border:3.5px solid var(--pill-on);border-top-color:var(--ink);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #busy .msg{font-size:14.5px;font-weight:600;color:var(--gray2);}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<!-- 관리자 비밀번호 게이트 -->
+<div id="gate">
+  <div class="gate-box">
+    <div class="emoji">🛠️</div>
+    <h2>메뉴 설명 업로드</h2>
+    <p>관리자 비밀번호를 입력해주세요</p>
+    <input id="gate-input" type="password" autocomplete="off" placeholder="관리자 비밀번호">
+    <button id="gate-btn">확인</button>
+    <div class="gate-err" id="gate-err"></div>
+  </div>
+</div>
+
+<div class="top">
+  <h1>🛠️ 메뉴 설명 업로드</h1>
+  <p>AI 제작 완료된 메뉴 설명을 등록하면 세일즈 조회 페이지에 바로 반영됩니다</p>
+</div>
+
+<div class="wrap">
+  <!-- 현재 상태 -->
+  <div class="card">
+    <h3>📊 현재 등록 현황</h3>
+    <div id="status-line">불러오는 중…</div>
+  </div>
+
+  <!-- 입력 -->
+  <div class="card" id="input-card">
+    <h3>1️⃣ 데이터 입력</h3>
+    <div class="hint">
+      컬럼 순서: <code>스토어ID</code> <code>스토어명</code> <code>메뉴명</code> <code>메뉴설명</code><br>
+      엑셀에서 해당 4개 열을 선택해 복사한 뒤 아래에 붙여넣으세요. (첫 줄이 제목 행이면 자동으로 건너뜁니다)
+    </div>
+    <textarea id="paste-area" placeholder="여기에 엑셀 내용을 붙여넣기 (Ctrl+V)&#10;&#10;예시:&#10;12345	모던식당	김치찌개	묵은지와 두툼한 돼지고기를 넣고 끓여낸…&#10;12345	모던식당	제육볶음	매콤달콤한 양념에 볶아낸…"></textarea>
+    <div class="or">또는</div>
+    <div class="file-row">
+      <label class="file-btn" for="file-input">📁 CSV/TSV 파일 선택</label>
+      <input id="file-input" type="file" accept=".csv,.tsv,.txt">
+      <span id="file-name"></span>
+    </div>
+    <div style="margin-top:14px;">
+      <button class="btn-primary" id="btn-parse">데이터 확인 →</button>
+    </div>
+  </div>
+
+  <!-- 미리보기 -->
+  <div class="card hidden" id="preview-card">
+    <h3>2️⃣ 업로드 전 확인</h3>
+    <div class="stats">
+      <div class="stat"><div class="v" id="pv-stores">0</div><div class="k">스토어</div></div>
+      <div class="stat"><div class="v" id="pv-rows">0</div><div class="k">메뉴(행)</div></div>
+      <div class="stat"><div class="v" id="pv-errors">0</div><div class="k">제외된 행</div></div>
+    </div>
+    <div class="errbox hidden" id="pv-errbox"></div>
+    <div class="warn">⚠️ 업로드에 포함된 <b>스토어ID의 기존 데이터는 새 데이터로 교체</b>됩니다.<br>포함되지 않은 스토어는 그대로 유지됩니다.</div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>스토어ID</th><th>스토어명</th><th>메뉴명</th><th>메뉴설명</th></tr></thead>
+        <tbody id="pv-tbody"></tbody>
+      </table>
+    </div>
+    <button class="btn-primary" id="btn-upload">🚀 업로드 실행</button>
+    <button class="btn-ghost" id="btn-cancel">다시 입력</button>
+  </div>
+
+  <!-- 결과 -->
+  <div class="card hidden" id="result-card">
+    <h3>3️⃣ 업로드 결과</h3>
+    <div class="okbox" id="result-box"></div>
+    <button class="btn-ghost" id="btn-again">새 데이터 업로드</button>
+  </div>
+</div>
+
+<div id="busy"><div class="spinner"></div><div class="msg" id="busy-msg">처리 중…</div></div>
+<div id="toast"></div>
+
+<script>
+/* ═══════════ 설정 ═══════════ */
+const SERVER_URL = "https://menu-check-564449764059.asia-northeast3.run.app";
+const KEY_STORAGE = "md_admin_key";
+
+let parsedRows = [];   // [{storeId,storeName,menuName,desc}]
+const $ = (id)=>document.getElementById(id);
+
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove("show"), 2500);
+}
+function busy(on, msg){
+  $("busy").classList.toggle("show", !!on);
+  if(msg) $("busy-msg").textContent = msg;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+/* ═══════════ 인증 (관리자 role 필요) ═══════════ */
+function getKey(){ return localStorage.getItem(KEY_STORAGE) || ""; }
+
+async function verifyAdmin(key){
+  const r = await fetch(SERVER_URL + "/menu-desc/ping", { headers: { "x-access-key": key } });
+  if(!r.ok) return false;
+  const d = await r.json();
+  return d.role === "admin";
+}
+
+async function gateSubmit(){
+  const key = $("gate-input").value.trim();
+  if(!key) return;
+  $("gate-err").textContent = "";
+  busy(true, "확인 중…");
+  try{
+    if(await verifyAdmin(key)){
+      localStorage.setItem(KEY_STORAGE, key);
+      $("gate").classList.remove("show");
+      loadStatus();
+    }else{
+      $("gate-err").textContent = "관리자 비밀번호가 올바르지 않습니다.";
+    }
+  }catch(e){
+    $("gate-err").textContent = "서버에 연결할 수 없습니다.";
+  }finally{
+    busy(false);
+  }
+}
+$("gate-btn").addEventListener("click", gateSubmit);
+$("gate-input").addEventListener("keydown", e=>{ if(e.key==="Enter") gateSubmit(); });
+
+/* ═══════════ 현재 상태 ═══════════ */
+async function loadStatus(){
+  try{
+    const r = await fetch(SERVER_URL + "/menu-desc/data", { headers: { "x-access-key": getKey() } });
+    if(r.status === 401){
+      localStorage.removeItem(KEY_STORAGE);
+      $("gate").classList.add("show");
+      return;
+    }
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.status);
+    const stores = d.stores || [];
+    const rows = stores.reduce((a,s)=>a+s.menus.length, 0);
+    const latest = stores.map(s=>s.updatedAt||"").sort().pop() || "";
+    $("status-line").innerHTML =
+      `등록된 스토어 <b>${stores.length}개</b> · 메뉴 <b>${rows}개</b>` +
+      (latest ? ` · 마지막 업로드 <b>${escapeHtml(latest.slice(0,16))}</b>` : "");
+  }catch(e){
+    $("status-line").textContent = "현황을 불러오지 못했습니다: " + (e.message || e);
+  }
+}
+
+/* ═══════════ 파일 읽기 (EUC-KR 자동 감지) ═══════════ */
+function readFileSmart(file){
+  return new Promise((resolve, reject)=>{
+    const fr = new FileReader();
+    fr.onerror = ()=>reject(new Error("파일을 읽을 수 없습니다."));
+    fr.onload = ()=>{
+      const buf = fr.result;
+      const utf8 = new TextDecoder("utf-8", { fatal:false }).decode(buf);
+      // 한국 엑셀 CSV는 EUC-KR인 경우가 많음 — UTF-8 해석에 깨진 문자가 있으면 EUC-KR로 재시도
+      if(utf8.includes("�")){
+        try{ return resolve(new TextDecoder("euc-kr").decode(buf)); }catch(e){ /* euc-kr 미지원 브라우저 */ }
+      }
+      resolve(utf8.replace(/^﻿/, ""));
+    };
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+let fileText = "";
+$("file-input").addEventListener("change", async (e)=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  try{
+    fileText = await readFileSmart(f);
+    $("file-name").textContent = `${f.name} (${Math.round(f.size/1024)}KB)`;
+    $("paste-area").value = "";
+    toast("📁 파일을 읽었습니다. [데이터 확인]을 눌러주세요");
+  }catch(err){
+    toast("파일 읽기 실패: " + err.message);
+  }
+});
+$("paste-area").addEventListener("input", ()=>{
+  if($("paste-area").value.trim()){
+    fileText = "";
+    $("file-name").textContent = "";
+    $("file-input").value = "";
+  }
+});
+
+/* ═══════════ 파싱 (TSV / CSV, 따옴표 지원) ═══════════ */
+function parseDelimited(text){
+  // 구분자 감지: 탭이 있으면 TSV(엑셀 붙여넣기), 없으면 CSV
+  const delim = text.includes("\t") ? "\t" : ",";
+  const rows = [];
+  let cur = [], field = "", inQuote = false;
+  const src = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for(let i=0; i<src.length; i++){
+    const c = src[i];
+    if(inQuote){
+      if(c === '"'){
+        if(src[i+1] === '"'){ field += '"'; i++; }
+        else inQuote = false;
+      }else field += c;
+    }else{
+      if(c === '"' && field === "") inQuote = true;
+      else if(c === delim){ cur.push(field); field = ""; }
+      else if(c === "\n"){ cur.push(field); rows.push(cur); cur = []; field = ""; }
+      else field += c;
+    }
+  }
+  if(field !== "" || cur.length) { cur.push(field); rows.push(cur); }
+  return rows;
+}
+
+function looksLikeHeader(cols){
+  const joined = cols.join(" ").toLowerCase();
+  return /스토어|상호|메뉴|설명|store|shop|name|desc|id/.test(joined) && !/^\d+$/.test(String(cols[0]||"").trim());
+}
+
+$("btn-parse").addEventListener("click", ()=>{
+  const text = ($("paste-area").value.trim() || fileText).trim();
+  if(!text){
+    toast("붙여넣기 또는 파일 선택으로 데이터를 먼저 입력해주세요");
+    return;
+  }
+  const raw = parseDelimited(text).filter(r => r.some(c => String(c).trim() !== ""));
+  if(raw.length === 0){ toast("읽을 수 있는 행이 없습니다"); return; }
+
+  let start = 0;
+  if(looksLikeHeader(raw[0])) start = 1;
+
+  parsedRows = [];
+  const errors = [];
+  for(let i=start; i<raw.length; i++){
+    const cols = raw[i].map(c=>String(c).trim());
+    const [storeId, storeName, menuName, ...rest] = cols;
+    const desc = rest.join(" ").trim(); // 설명에 구분자가 섞여 5번째 컬럼 이후로 밀린 경우 합침
+    if(!storeId || !menuName){
+      errors.push(`${i+1}행: ${!storeId ? "스토어ID 없음" : "메뉴명 없음"} — "${cols.slice(0,3).join(" | ").slice(0,50)}"`);
+      continue;
+    }
+    parsedRows.push({ storeId, storeName: storeName||"", menuName, desc });
+  }
+
+  if(parsedRows.length === 0){
+    toast("유효한 행이 없습니다. 컬럼 순서를 확인해주세요");
+    return;
+  }
+
+  const storeCount = new Set(parsedRows.map(r=>r.storeId)).size;
+  $("pv-stores").textContent = storeCount;
+  $("pv-rows").textContent = parsedRows.length;
+  $("pv-errors").textContent = errors.length;
+  $("pv-errbox").classList.toggle("hidden", errors.length === 0);
+  $("pv-errbox").innerHTML = errors.slice(0,30).map(escapeHtml).join("<br>") + (errors.length>30 ? `<br>…외 ${errors.length-30}건` : "");
+
+  const PREVIEW_N = 50;
+  $("pv-tbody").innerHTML = parsedRows.slice(0, PREVIEW_N).map(r=>`
+    <tr>
+      <td>${escapeHtml(r.storeId)}</td>
+      <td>${escapeHtml(r.storeName)}</td>
+      <td>${escapeHtml(r.menuName)}</td>
+      <td class="desc-cell">${escapeHtml(r.desc.length>80 ? r.desc.slice(0,80)+"…" : r.desc)}</td>
+    </tr>`).join("") +
+    (parsedRows.length > PREVIEW_N ? `<tr><td colspan="4" style="color:var(--gray);">…외 ${parsedRows.length - PREVIEW_N}행</td></tr>` : "");
+
+  $("preview-card").classList.remove("hidden");
+  $("result-card").classList.add("hidden");
+  $("preview-card").scrollIntoView({ behavior:"smooth" });
+});
+
+$("btn-cancel").addEventListener("click", ()=>{
+  $("preview-card").classList.add("hidden");
+  $("input-card").scrollIntoView({ behavior:"smooth" });
+});
+
+/* ═══════════ 업로드 ═══════════ */
+$("btn-upload").addEventListener("click", async ()=>{
+  if(parsedRows.length === 0) return;
+  busy(true, `${parsedRows.length}행 업로드 중…`);
+  try{
+    const r = await fetch(SERVER_URL + "/menu-desc/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-access-key": getKey() },
+      body: JSON.stringify({ rows: parsedRows }),
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || "HTTP " + r.status);
+
+    $("result-box").innerHTML =
+      `✅ 업로드 완료!<br>` +
+      `· 이번 업로드: 스토어 <b>${d.uploadedStores}개</b> / 메뉴 <b>${d.uploadedRows}개</b><br>` +
+      `· 전체 등록: 스토어 <b>${d.totalStores}개</b> / 메뉴 <b>${d.totalRows}개</b><br>` +
+      `세일즈 조회 페이지에 바로 반영되었습니다.`;
+    $("preview-card").classList.add("hidden");
+    $("result-card").classList.remove("hidden");
+    $("paste-area").value = "";
+    fileText = "";
+    $("file-name").textContent = "";
+    $("file-input").value = "";
+    parsedRows = [];
+    loadStatus();
+    $("result-card").scrollIntoView({ behavior:"smooth" });
+  }catch(e){
+    toast("업로드 실패: " + (e.message || e));
+  }finally{
+    busy(false);
+  }
+});
+
+$("btn-again").addEventListener("click", ()=>{
+  $("result-card").classList.add("hidden");
+  window.scrollTo({ top:0, behavior:"smooth" });
+});
+
+/* ═══════════ 시작 ═══════════ */
+(async function init(){
+  const key = getKey();
+  if(!key){
+    $("gate").classList.add("show");
+    return;
+  }
+  // 저장된 키가 여전히 유효한지 확인
+  try{
+    if(await verifyAdmin(key)) loadStatus();
+    else{ localStorage.removeItem(KEY_STORAGE); $("gate").classList.add("show"); }
+  }catch(e){
+    $("gate").classList.add("show");
+  }
+})();
+</script>
+</body>
+</html>
