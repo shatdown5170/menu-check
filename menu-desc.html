@@ -74,6 +74,12 @@
   .store-head{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
   .store-head h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-0.4px;}
   .store-head .sub{font-size:13px;color:var(--gray);margin-top:6px;display:flex;flex-wrap:wrap;gap:6px 12px;}
+  .intro-card{background:var(--blue-soft);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;}
+  .intro-card .i-tag{font-size:11.5px;font-weight:800;color:var(--blue);margin-bottom:4px;}
+  .intro-card .i-text{font-size:14px;white-space:pre-wrap;word-break:break-word;}
+  .group-head{margin:20px 2px 10px;padding-bottom:8px;border-bottom:2px solid var(--pill-on);}
+  .group-head .g-name{font-size:17px;font-weight:800;}
+  .group-head .g-desc{font-size:13px;color:var(--gray2);margin-top:3px;white-space:pre-wrap;word-break:break-word;}
   .menu-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:10px;}
   .menu-card .m-name{font-size:16px;font-weight:700;display:flex;gap:8px;}
   .menu-card .m-name .num{color:var(--gray);font-weight:600;flex-shrink:0;}
@@ -262,6 +268,8 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+function menuCount(s){ return (s.groups||[]).reduce((a,g)=>a+g.menus.length, 0); }
+
 function renderList(){
   const q = $("search-input").value.trim().toLowerCase();
   const filtered = q
@@ -282,7 +290,7 @@ function renderList(){
     <div class="store-item" data-id="${escapeHtml(s.id)}">
       <div class="info">
         <div class="name">${escapeHtml(s.name || "(상호명 없음)")}</div>
-        <div class="sub">ID ${escapeHtml(s.id)} · 메뉴 ${s.menus.length}개${s.updatedAt ? " · " + escapeHtml(s.updatedAt.slice(0,10)) : ""}</div>
+        <div class="sub">ID ${escapeHtml(s.id)} · 메뉴 ${menuCount(s)}개${s.updatedAt ? " · " + escapeHtml(s.updatedAt.slice(0,10)) : ""}</div>
       </div>
       <div class="arrow">›</div>
     </div>`).join("");
@@ -299,13 +307,29 @@ function openDetail(id){
   $("d-name").textContent = currentStore.name || "(상호명 없음)";
   $("d-sub").innerHTML =
     `<span>스토어 ID <b>${escapeHtml(currentStore.id)}</b></span>` +
-    `<span>메뉴 ${currentStore.menus.length}개</span>` +
+    `<span>메뉴 ${menuCount(currentStore)}개</span>` +
     (currentStore.updatedAt ? `<span>업데이트 ${escapeHtml(currentStore.updatedAt.slice(0,10))}</span>` : "");
-  $("d-menus").innerHTML = currentStore.menus.map((m,i)=>`
+
+  let html = "";
+  if(currentStore.intro){
+    html += `<div class="intro-card"><div class="i-tag">매장 소개</div><div class="i-text">${escapeHtml(currentStore.intro)}</div></div>`;
+  }
+  let n = 0;
+  for(const g of currentStore.groups){
+    if(g.name || g.desc){
+      html += `<div class="group-head"><div class="g-name">${escapeHtml(g.name || "기타")}</div>${
+        g.desc ? `<div class="g-desc">${escapeHtml(g.desc)}</div>` : ""}</div>`;
+    }
+    for(const m of g.menus){
+      n++;
+      html += `
     <div class="menu-card">
-      <div class="m-name"><span class="num">${i+1}.</span><span>${escapeHtml(m.name)}</span></div>
+      <div class="m-name"><span class="num">${n}.</span><span>${escapeHtml(m.name)}</span></div>
       ${m.desc ? `<div class="m-desc">${escapeHtml(m.desc)}</div>` : ""}
-    </div>`).join("");
+    </div>`;
+    }
+  }
+  $("d-menus").innerHTML = html;
   $("list-view").classList.add("hide");
   $("detail").classList.add("show");
   $("action-bar").classList.add("show");
@@ -322,13 +346,26 @@ $("back-btn").addEventListener("click", ()=>{
 function buildText(store){
   const lines = [];
   lines.push(`■ ${store.name || "(상호명 없음)"} (스토어 ID: ${store.id})`);
-  lines.push(`메뉴 설명 ${store.menus.length}개${store.updatedAt ? " · 업데이트 " + store.updatedAt.slice(0,10) : ""}`);
+  lines.push(`메뉴 설명 ${menuCount(store)}개${store.updatedAt ? " · 업데이트 " + store.updatedAt.slice(0,10) : ""}`);
   lines.push("");
-  store.menus.forEach((m,i)=>{
-    lines.push(`${i+1}. ${m.name}`);
-    if(m.desc) lines.push(m.desc);
+  if(store.intro){
+    lines.push(store.intro);
     lines.push("");
-  });
+  }
+  let n = 0;
+  for(const g of store.groups){
+    if(g.name || g.desc){
+      lines.push(`[${g.name || "기타"}]`);
+      if(g.desc) lines.push(g.desc);
+      lines.push("");
+    }
+    for(const m of g.menus){
+      n++;
+      lines.push(`${n}. ${m.name}`);
+      if(m.desc) lines.push(m.desc);
+      lines.push("");
+    }
+  }
   return lines.join("\n").trim();
 }
 
@@ -370,8 +407,11 @@ const F_TITLE  = '800 46px ' + FONT_STACK;
 const F_SUB    = '400 27px ' + FONT_STACK;
 const F_MNAME  = '700 34px ' + FONT_STACK;
 const F_MDESC  = '400 29px ' + FONT_STACK;
+const F_GNAME  = '800 38px ' + FONT_STACK;
+const F_GDESC  = '400 27px ' + FONT_STACK;
+const F_ITAG   = '800 24px ' + FONT_STACK;
 const F_FOOT   = '400 23px ' + FONT_STACK;
-const LH_MNAME = 48, LH_MDESC = 46;
+const LH_MNAME = 48, LH_MDESC = 46, LH_GNAME = 52, LH_GDESC = 40;
 
 function wrapText(ctx, text, font, maxW){
   ctx.font = font;
@@ -417,31 +457,47 @@ function buildImagePages(store){
   const measure = document.createElement("canvas").getContext("2d");
   const innerW = IMG_W - IMG_PAD*2;
   const cardInnerW = innerW - CARD_PAD*2;
+  const maxCardH = MAX_PAGE_H - IMG_PAD*2 - 200;
 
-  // 메뉴 카드들을 (필요시 설명을 쪼개가며) 블록으로 변환
+  // 소개/그룹/메뉴를 순서대로 블록으로 변환
   const blocks = [];
-  store.menus.forEach((m, i)=>{
-    const nameLines = wrapText(measure, `${i+1}. ${m.name}`, F_MNAME, cardInnerW);
-    const descLines = m.desc ? wrapText(measure, m.desc, F_MDESC, cardInnerW) : [];
-    const makeBlock = (nl, dl, cont)=>({
-      nameLines: nl, descLines: dl, cont,
-      h: CARD_PAD*2 + nl.length*LH_MNAME + (dl.length ? 14 + dl.length*LH_MDESC : 0),
-    });
-    const maxCardH = MAX_PAGE_H - IMG_PAD*2 - 200;
-    let block = makeBlock(nameLines, descLines, false);
-    if(block.h <= maxCardH){
-      blocks.push(block);
-    }else{
-      // 카드 하나가 페이지보다 크면 설명 줄을 나눠 '(이어서)' 카드로 분할
-      const headH = CARD_PAD*2 + nameLines.length*LH_MNAME + 14;
-      const perPage = Math.max(5, Math.floor((maxCardH - headH) / LH_MDESC));
-      for(let s=0; s<descLines.length; s+=perPage){
-        blocks.push(makeBlock(
-          s===0 ? nameLines : wrapText(measure, `${i+1}. ${m.name} (이어서)`, F_MNAME, cardInnerW),
-          descLines.slice(s, s+perPage), s>0));
+
+  if(store.intro){
+    const lines = wrapText(measure, store.intro, F_MDESC, cardInnerW);
+    blocks.push({ kind:"intro", lines, h: CARD_PAD*2 + 34 + lines.length*LH_MDESC });
+  }
+
+  let n = 0;
+  for(const g of store.groups){
+    if(g.name || g.desc){
+      const nameLines = wrapText(measure, g.name || "기타", F_GNAME, innerW);
+      const descLines = g.desc ? wrapText(measure, g.desc, F_GDESC, innerW) : [];
+      blocks.push({ kind:"ghead", nameLines, descLines,
+        h: 20 + nameLines.length*LH_GNAME + (descLines.length ? 6 + descLines.length*LH_GDESC : 0) + 18 });
+    }
+    for(const m of g.menus){
+      n++;
+      const nameLines = wrapText(measure, `${n}. ${m.name}`, F_MNAME, cardInnerW);
+      const descLines = m.desc ? wrapText(measure, m.desc, F_MDESC, cardInnerW) : [];
+      const makeBlock = (nl, dl, cont)=>({
+        kind:"menu", nameLines: nl, descLines: dl, cont,
+        h: CARD_PAD*2 + nl.length*LH_MNAME + (dl.length ? 14 + dl.length*LH_MDESC : 0),
+      });
+      const block = makeBlock(nameLines, descLines, false);
+      if(block.h <= maxCardH){
+        blocks.push(block);
+      }else{
+        // 카드 하나가 페이지보다 크면 설명 줄을 나눠 '(이어서)' 카드로 분할
+        const headH = CARD_PAD*2 + nameLines.length*LH_MNAME + 14;
+        const perPage = Math.max(5, Math.floor((maxCardH - headH) / LH_MDESC));
+        for(let s=0; s<descLines.length; s+=perPage){
+          blocks.push(makeBlock(
+            s===0 ? nameLines : wrapText(measure, `${n}. ${m.name} (이어서)`, F_MNAME, cardInnerW),
+            descLines.slice(s, s+perPage), s>0));
+        }
       }
     }
-  });
+  }
 
   // 헤더 높이 계산
   const titleLines = wrapText(measure, store.name || "(상호명 없음)", F_TITLE, innerW);
@@ -485,7 +541,7 @@ function buildImagePages(store){
     for(const ln of titleLines){ ctx.fillText(ln, IMG_PAD, y); y += 62; }
     ctx.fillStyle = "#787774";
     ctx.font = F_SUB;
-    const subParts = [`스토어 ID ${store.id}`, `메뉴 ${store.menus.length}개`];
+    const subParts = [`스토어 ID ${store.id}`, `메뉴 ${menuCount(store)}개`];
     if(store.updatedAt) subParts.push(`업데이트 ${store.updatedAt.slice(0,10)}`);
     if(pages.length > 1) subParts.push(`${pi+1} / ${pages.length} 페이지`);
     ctx.fillText(subParts.join("  ·  "), IMG_PAD, y + 6);
@@ -495,23 +551,51 @@ function buildImagePages(store){
     ctx.beginPath(); ctx.moveTo(IMG_PAD, y+16); ctx.lineTo(IMG_W-IMG_PAD, y+16); ctx.stroke();
     y += 30 + 24;
 
-    // 메뉴 카드
+    // 블록 렌더링 (소개 카드 / 그룹 헤더 / 메뉴 카드)
     for(const b of pageBlocks){
-      ctx.fillStyle = "#FFFFFF";
-      ctx.strokeStyle = "#EAE9E5";
-      ctx.lineWidth = 2;
-      roundRect(ctx, IMG_PAD, y, innerW, b.h, 18);
-      ctx.fill(); ctx.stroke();
-
-      let ty = y + CARD_PAD;
-      ctx.fillStyle = b.cont ? "#9B9A97" : "#37352F";
-      ctx.font = F_MNAME;
-      for(const ln of b.nameLines){ ctx.fillText(ln, IMG_PAD + CARD_PAD, ty); ty += LH_MNAME; }
-      if(b.descLines.length){
-        ty += 14;
-        ctx.fillStyle = "#57564F";
+      if(b.kind === "intro"){
+        ctx.fillStyle = "#E7F1FB";
+        roundRect(ctx, IMG_PAD, y, innerW, b.h, 18);
+        ctx.fill();
+        let ty = y + CARD_PAD;
+        ctx.fillStyle = "#2383E2";
+        ctx.font = F_ITAG;
+        ctx.fillText("매장 소개", IMG_PAD + CARD_PAD, ty);
+        ty += 34;
+        ctx.fillStyle = "#37352F";
         ctx.font = F_MDESC;
-        for(const ln of b.descLines){ ctx.fillText(ln, IMG_PAD + CARD_PAD, ty); ty += LH_MDESC; }
+        for(const ln of b.lines){ ctx.fillText(ln, IMG_PAD + CARD_PAD, ty); ty += LH_MDESC; }
+      }else if(b.kind === "ghead"){
+        let ty = y + 20;
+        ctx.fillStyle = "#37352F";
+        ctx.font = F_GNAME;
+        for(const ln of b.nameLines){ ctx.fillText(ln, IMG_PAD, ty); ty += LH_GNAME; }
+        if(b.descLines.length){
+          ty += 6;
+          ctx.fillStyle = "#787774";
+          ctx.font = F_GDESC;
+          for(const ln of b.descLines){ ctx.fillText(ln, IMG_PAD, ty); ty += LH_GDESC; }
+        }
+        ctx.strokeStyle = "#E3E2DD";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(IMG_PAD, y + b.h - 4); ctx.lineTo(IMG_W - IMG_PAD, y + b.h - 4); ctx.stroke();
+      }else{
+        ctx.fillStyle = "#FFFFFF";
+        ctx.strokeStyle = "#EAE9E5";
+        ctx.lineWidth = 2;
+        roundRect(ctx, IMG_PAD, y, innerW, b.h, 18);
+        ctx.fill(); ctx.stroke();
+
+        let ty = y + CARD_PAD;
+        ctx.fillStyle = b.cont ? "#9B9A97" : "#37352F";
+        ctx.font = F_MNAME;
+        for(const ln of b.nameLines){ ctx.fillText(ln, IMG_PAD + CARD_PAD, ty); ty += LH_MNAME; }
+        if(b.descLines.length){
+          ty += 14;
+          ctx.fillStyle = "#57564F";
+          ctx.font = F_MDESC;
+          for(const ln of b.descLines){ ctx.fillText(ln, IMG_PAD + CARD_PAD, ty); ty += LH_MDESC; }
+        }
       }
       y += b.h + CARD_GAP;
     }

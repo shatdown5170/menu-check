@@ -188,8 +188,11 @@ const MENU_DESC_SHEET_NAME = process.env.MENU_DESC_SHEET_NAME || "메뉴설명";
 const MENU_DESC_VIEW_KEY = process.env.MENU_DESC_VIEW_KEY;   // 세일즈 열람용 비밀번호
 const MENU_DESC_ADMIN_KEY = process.env.MENU_DESC_ADMIN_KEY; // 업로드(관리자)용 비밀번호
 
-// 시트 컬럼: A 스토어ID | B 스토어명 | C 메뉴명 | D 메뉴설명 | E 업로드일시
-const SHEET_HEADER = ["스토어ID", "스토어명", "메뉴명", "메뉴설명", "업로드일시"];
+// 시트 컬럼: A 스토어ID | B 스토어명 | C 구분 | D 이름 | E 설명 | F 업로드일시
+//   구분 = 소개(스토어 소개문) | 그룹(디쉬그룹명+설명) | 메뉴(디쉬명+설명)
+//   행 순서가 곧 표시 순서. '메뉴' 행은 바로 위의 '그룹' 행에 속함.
+const SHEET_HEADER = ["스토어ID", "스토어명", "구분", "이름", "설명", "업로드일시"];
+const ROW_KINDS = new Set(["소개", "그룹", "메뉴"]);
 
 // ── 서비스 계정 JWT → 액세스 토큰 (라이브러리 없이 직접 서명, 만료 전까지 캐시) ──
 let cachedToken = null; // { token, exp }
@@ -289,30 +292,31 @@ async function ensureSheetTab() {
     method: "POST",
     body: JSON.stringify({ requests: [{ addSheet: { properties: { title: MENU_DESC_SHEET_NAME } } }] }),
   });
-  await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A1:E1?valueInputOption=RAW`, {
+  await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A1:F1?valueInputOption=RAW`, {
     method: "PUT",
     body: JSON.stringify({ values: [SHEET_HEADER] }),
   });
 }
 
-// 시트 전체 읽기 → 행 배열 [{storeId,storeName,menuName,desc,updatedAt}]
+// 시트 전체 읽기 → 행 배열 [{storeId,storeName,kind,name,desc,updatedAt}] (시트 순서 유지)
 async function readAllRows() {
   await ensureSheetTab();
-  const data = await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A:E`);
+  const data = await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A:F`);
   const values = data.values || [];
   const rows = [];
   for (let i = 0; i < values.length; i++) {
-    const [storeId, storeName, menuName, desc, updatedAt] = values[i].map((v) => String(v ?? "").trim());
+    const [storeId, storeName, kind, name, desc, updatedAt] = values[i].map((v) => String(v ?? "").trim());
     if (!storeId || storeId === SHEET_HEADER[0]) continue; // 헤더/빈 행 제외
-    rows.push({ storeId, storeName: storeName || "", menuName: menuName || "", desc: desc || "", updatedAt: updatedAt || "" });
+    if (!ROW_KINDS.has(kind)) continue; // 구형/알 수 없는 형식 행은 무시
+    rows.push({ storeId, storeName: storeName || "", kind, name: name || "", desc: desc || "", updatedAt: updatedAt || "" });
   }
   return rows;
 }
 
 // 시트 전체 다시 쓰기 (헤더 + 행)
 async function writeAllRows(rows) {
-  await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A:E:clear`, { method: "POST", body: "{}" });
-  const values = [SHEET_HEADER, ...rows.map((r) => [r.storeId, r.storeName, r.menuName, r.desc, r.updatedAt])];
+  await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A:F:clear`, { method: "POST", body: "{}" });
+  const values = [SHEET_HEADER, ...rows.map((r) => [r.storeId, r.storeName, r.kind, r.name, r.desc, r.updatedAt])];
   await sheetsApi(`/values/${encodeURIComponent(MENU_DESC_SHEET_NAME)}!A1?valueInputOption=RAW`, {
     method: "PUT",
     body: JSON.stringify({ values }),
@@ -348,7 +352,7 @@ app.get("/menu-desc/ping", (req, res) => {
   res.json({ ok: true, role });
 });
 
-// 전체 데이터 조회 (스토어별 그룹)
+// 전체 데이터 조회 — 스토어별 { id, name, updatedAt, intro, groups:[{name,desc,menus:[{name,desc}]}] }
 app.get("/menu-desc/data", async (req, res) => {
   try {
     if (!requireConfig(res)) return;
@@ -358,12 +362,19 @@ app.get("/menu-desc/data", async (req, res) => {
     const byStore = new Map();
     for (const r of rows) {
       if (!byStore.has(r.storeId)) {
-        byStore.set(r.storeId, { id: r.storeId, name: r.storeName, updatedAt: r.updatedAt, menus: [] });
+        byStore.set(r.storeId, { id: r.storeId, name: r.storeName, updatedAt: r.updatedAt, intro: "", groups: [] });
       }
       const s = byStore.get(r.storeId);
       if (r.storeName) s.name = r.storeName;
       if (r.updatedAt > s.updatedAt) s.updatedAt = r.updatedAt;
-      s.menus.push({ name: r.menuName, desc: r.desc });
+      if (r.kind === "소개") {
+        s.intro = r.desc;
+      } else if (r.kind === "그룹") {
+        s.groups.push({ name: r.name, desc: r.desc, menus: [] });
+      } else { // 메뉴 — 바로 위 그룹에 소속, 그룹이 없으면 이름 없는 그룹에
+        if (s.groups.length === 0) s.groups.push({ name: "", desc: "", menus: [] });
+        s.groups[s.groups.length - 1].menus.push({ name: r.name, desc: r.desc });
+      }
     }
     res.json({ stores: [...byStore.values()] });
   } catch (e) {
@@ -373,6 +384,7 @@ app.get("/menu-desc/data", async (req, res) => {
 });
 
 // 데이터 업로드 — 업로드에 포함된 스토어는 교체, 나머지는 유지
+// body: { rows: [{storeId, storeName, kind:'소개'|'그룹'|'메뉴', name, desc}] } (순서 = 표시 순서)
 app.post("/menu-desc/upload", async (req, res) => {
   try {
     if (!requireConfig(res)) return;
@@ -383,12 +395,14 @@ app.post("/menu-desc/upload", async (req, res) => {
       .map((r) => ({
         storeId: String(r.storeId ?? "").trim(),
         storeName: String(r.storeName ?? "").trim(),
-        menuName: String(r.menuName ?? "").trim(),
+        kind: String(r.kind ?? "메뉴").trim(),
+        name: String(r.name ?? "").trim(),
         desc: String(r.desc ?? "").trim(),
       }))
-      .filter((r) => r.storeId && r.menuName);
+      // 소개는 설명이, 그룹/메뉴는 이름이 있어야 유효
+      .filter((r) => r.storeId && ROW_KINDS.has(r.kind) && (r.kind === "소개" ? r.desc : r.name));
     if (cleaned.length === 0) {
-      return res.status(400).json({ error: "업로드할 유효한 행이 없습니다. (스토어ID와 메뉴명은 필수)" });
+      return res.status(400).json({ error: "업로드할 유효한 행이 없습니다. (스토어ID와 이름/설명 확인)" });
     }
 
     const now = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }); // YYYY-MM-DD HH:mm:ss
@@ -403,6 +417,7 @@ app.post("/menu-desc/upload", async (req, res) => {
       ok: true,
       uploadedStores: uploadedIds.size,
       uploadedRows: cleaned.length,
+      uploadedMenus: cleaned.filter((r) => r.kind === "메뉴").length,
       totalStores: new Set(merged.map((r) => r.storeId)).size,
       totalRows: merged.length,
     });
