@@ -50,6 +50,15 @@
   @media (prefers-reduced-motion: reduce){ .screen{transition:none;} }
 
   .scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+  .scroll-wrap{flex:1;position:relative;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* ── 당겨서 새로고침 ── */
+  .ptr{position:absolute;top:2px;left:0;right:0;display:flex;justify-content:center;z-index:6;
+    pointer-events:none;opacity:0;transform:translateY(-10px);transition:transform .22s, opacity .22s;}
+  .ptr .circ{width:42px;height:42px;border-radius:50%;background:rgba(33,33,36,.62);color:#fff;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.22);
+    backdrop-filter:blur(4px);}
+  .ptr.spin .circ svg{animation:spin .8s linear infinite;}
 
   /* ── 비밀번호 게이트 ── */
   #gate{position:absolute;inset:0;z-index:100;background:#fff;display:none;align-items:center;justify-content:center;padding:24px;}
@@ -188,9 +197,16 @@
         <input id="search-input" type="search" placeholder="스토어 ID 또는 상호명 검색" autocomplete="off">
       </div>
     </div>
-    <div class="scroll">
-      <div class="band"><span id="band-label">전체 스토어</span><span class="tag" id="band-count"></span></div>
-      <div id="store-list"><div class="list-state">데이터를 불러오는 중…</div></div>
+    <div class="scroll-wrap">
+      <div class="ptr" id="ptr" aria-hidden="true">
+        <div class="circ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        </div>
+      </div>
+      <div class="scroll" id="list-scroll">
+        <div class="band"><span id="band-label">전체 스토어</span><span class="tag" id="band-count"></span></div>
+        <div id="store-list"><div class="list-state">데이터를 불러오는 중…</div></div>
+      </div>
     </div>
   </div>
 
@@ -319,6 +335,7 @@ async function loadData(){
     const data = await r.json();
     if(!r.ok) throw new Error(data.error || "HTTP " + r.status);
     stores = (data.stores || []).sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||""));
+    lastFetch = Date.now();
     renderList();
   }catch(e){
     $("store-list").innerHTML = '<div class="list-state"><span class="emoji">⚠️</span>불러오기 실패<br>' +
@@ -358,6 +375,59 @@ function renderList(){
 }
 $("search-input").addEventListener("input", renderList);
 
+/* ═══════════ 당겨서 새로고침 ═══════════ */
+let lastFetch = 0;
+(function setupPullToRefresh(){
+  const sc = $("list-scroll");
+  const ptr = $("ptr");
+  let startY = null, dist = 0, refreshing = false;
+  const THRESHOLD = 60;
+
+  sc.addEventListener("touchstart", (e)=>{
+    if(refreshing){ startY = null; return; }
+    startY = sc.scrollTop <= 0 ? e.touches[0].clientY : null;
+    dist = 0;
+  }, { passive: true });
+
+  sc.addEventListener("touchmove", (e)=>{
+    if(startY === null || refreshing) return;
+    dist = e.touches[0].clientY - startY;
+    if(dist > 0 && sc.scrollTop <= 0){
+      const d = Math.min(dist * 0.45, 90);
+      ptr.style.transition = "none";
+      ptr.style.opacity = String(Math.min(d / 46, 1));
+      ptr.style.transform = `translateY(${d}px)`;
+      ptr.querySelector("svg").style.transform = `rotate(${d * 4}deg)`;
+    }
+  }, { passive: true });
+
+  sc.addEventListener("touchend", async ()=>{
+    if(startY === null || refreshing) return;
+    const d = Math.min(Math.max(dist, 0) * 0.45, 90);
+    startY = null;
+    ptr.style.transition = "";
+    if(d >= THRESHOLD){
+      refreshing = true;
+      ptr.classList.add("spin");
+      ptr.style.opacity = "1";
+      ptr.style.transform = `translateY(${THRESHOLD}px)`;
+      await loadData();
+      ptr.classList.remove("spin");
+      refreshing = false;
+      toast("새로고침 했어요");
+    }
+    ptr.style.opacity = "0";
+    ptr.style.transform = "translateY(-10px)";
+  });
+})();
+
+// 앱을 오래 벗어났다 돌아오면 자동 새로고침 (3분 경과 시)
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible" && getKey() && lastFetch && Date.now() - lastFetch > 3*60*1000){
+    loadData();
+  }
+});
+
 /* ═══════════ 상세 ═══════════ */
 function openDetail(id){
   currentStore = stores.find(s=>s.id===id);
@@ -394,28 +464,23 @@ $("btn-back").addEventListener("click", ()=>{
 });
 
 /* ═══════════ 텍스트 복사 / 공유 ═══════════ */
+// 단위(헤더/소개/그룹/디쉬)마다 빈 줄 하나로 구분 — 어디에 붙여넣어도 읽기 좋게
 function buildText(store){
-  const lines = [];
-  lines.push(`■ ${store.name || "(상호명 없음)"} (스토어 ID: ${store.id})`);
-  lines.push(`메뉴 설명 ${menuCount(store)}개${store.updatedAt ? " · 업데이트 " + store.updatedAt.slice(0,10) : ""}`);
-  lines.push("");
-  if(store.intro){
-    lines.push(store.intro);
-    lines.push("");
-  }
+  const parts = [];
+  parts.push(
+    `■ ${store.name || "(상호명 없음)"} (스토어 ID: ${store.id})\n` +
+    `메뉴 설명 ${menuCount(store)}개${store.updatedAt ? " · 업데이트 " + store.updatedAt.slice(0,10) : ""}`
+  );
+  if(store.intro) parts.push(store.intro);
   for(const g of store.groups){
     if(g.name || g.desc){
-      lines.push(`[${g.name || "기타"}]`);
-      if(g.desc) lines.push(g.desc);
-      lines.push("");
+      parts.push(`[${g.name || "기타"}]` + (g.desc ? "\n" + g.desc : ""));
     }
     for(const m of g.menus){
-      lines.push(m.name);
-      if(m.desc) lines.push(m.desc);
-      lines.push("");
+      parts.push(m.name + (m.desc ? "\n" + m.desc : ""));
     }
   }
-  return lines.join("\n").trim();
+  return parts.join("\n\n");
 }
 
 async function copyText(text){
