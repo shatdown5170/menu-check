@@ -101,20 +101,49 @@ if [[ -z "$TOKEN" ]]; then
   exit 1
 fi
 
+# JSON 응답에서 필드 추출 (실패 시 빈 문자열 — 스크립트가 죽지 않게)
+json_get() { # $1=파이썬 표현식 (변수 d 사용)
+  python3 -c "import json,sys
+try:
+    d = json.load(sys.stdin)
+    print($1)
+except Exception:
+    print('')"
+}
+
 if [[ -z "${SHEET_ID:-}" ]]; then
   echo "▶ 3/5 구글 시트 생성 + ${SHARE_EMAIL} 에 편집자 공유…"
-  SHEET_ID=$(curl -sf -X POST "https://sheets.googleapis.com/v4/spreadsheets" \
-    -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-    -d "{\"properties\":{\"title\":\"${SHEET_TITLE}\"},\"sheets\":[{\"properties\":{\"title\":\"${SHEET_TAB}\"}}]}" \
-    | python3 -c "import json,sys; print(json.load(sys.stdin)['spreadsheetId'])")
-  # 헤더 행 기록 (첫 번째 탭 = 메뉴설명)
+  # 방금 켠 Sheets/Drive API가 실제 사용 가능해지기까지 몇 분 걸릴 수 있어 재시도
+  SHEET_ID=""
+  for i in $(seq 1 10); do
+    RESP=$(curl -s -X POST "https://sheets.googleapis.com/v4/spreadsheets" \
+      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+      -d "{\"properties\":{\"title\":\"${SHEET_TITLE}\"},\"sheets\":[{\"properties\":{\"title\":\"${SHEET_TAB}\"}}]}") || RESP=""
+    SHEET_ID=$(printf '%s' "$RESP" | json_get "d.get('spreadsheetId','')")
+    if [[ -n "$SHEET_ID" ]]; then break; fi
+    ERRMSG=$(printf '%s' "$RESP" | json_get "d['error']['message'][:150]")
+    echo "   … 시트 생성 재시도 ($i/10) — 사유: ${ERRMSG:-응답 없음}"
+    sleep 15
+    if NEW_TOKEN=$(get_sa_token 2>/dev/null) && [[ -n "$NEW_TOKEN" ]]; then TOKEN="$NEW_TOKEN"; fi
+  done
+  if [[ -z "$SHEET_ID" ]]; then
+    echo "❌ 시트 생성이 계속 실패합니다 (위 '사유' 참고). 몇 분 뒤 스크립트를 다시 실행해보세요."
+    exit 1
+  fi
+  echo "   시트 생성 완료: $SHEET_ID"
+  # 헤더 행 기록 (첫 번째 탭 = 메뉴설명) — 실패해도 치명적이지 않음(첫 업로드 때 서버가 기록)
   curl -sf -X PUT "https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A1:E1?valueInputOption=RAW" \
     -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-    -d '{"values":[["스토어ID","스토어명","메뉴명","메뉴설명","업로드일시"]]}' >/dev/null
-  # 개인 계정에 편집자 권한 부여
-  curl -sf -X POST "https://www.googleapis.com/drive/v3/files/${SHEET_ID}/permissions?sendNotificationEmail=false" \
+    -d '{"values":[["스토어ID","스토어명","메뉴명","메뉴설명","업로드일시"]]}' >/dev/null \
+    || echo "   ⚠️ 헤더 기록 실패 (무시해도 됨 — 첫 업로드 때 자동 기록)"
+  # 개인 계정에 편집자 권한 부여 — 실패해도 서버 동작에는 지장 없음
+  PERM=$(curl -s -X POST "https://www.googleapis.com/drive/v3/files/${SHEET_ID}/permissions?sendNotificationEmail=false" \
     -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-    -d "{\"role\":\"writer\",\"type\":\"user\",\"emailAddress\":\"${SHARE_EMAIL}\"}" >/dev/null
+    -d "{\"role\":\"writer\",\"type\":\"user\",\"emailAddress\":\"${SHARE_EMAIL}\"}") || PERM=""
+  if [[ -z "$(printf '%s' "$PERM" | json_get "d.get('id','')")" ]]; then
+    echo "   ⚠️ 개인 계정 공유 실패: $(printf '%s' "$PERM" | json_get "d['error']['message'][:150]")"
+    echo "      (서버·업로드·조회는 정상 동작. 시트 열람만 안 되는 것이니 나중에 다시 시도 가능)"
+  fi
 else
   echo "▶ 3/5 기존 시트 사용: $SHEET_ID (서비스 계정 ${SA_EMAIL} 이 편집자로 공유돼 있어야 함)"
 fi
