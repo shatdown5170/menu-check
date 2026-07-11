@@ -2,9 +2,15 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="color-scheme" content="light only">
 <meta name="supported-color-schemes" content="light">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="메뉴설명">
 <title>메뉴 설명 조회</title>
 <style>
   @font-face{font-family:"Pretendard";font-weight:400;font-style:normal;font-display:swap;
@@ -204,6 +210,7 @@
         </div>
       </div>
       <div class="scroll" id="list-scroll">
+        <div id="recent-sec"></div>
         <div class="band"><span id="band-label">전체 스토어</span><span class="tag" id="band-count"></span></div>
         <div id="store-list"><div class="list-state">데이터를 불러오는 중…</div></div>
       </div>
@@ -343,12 +350,47 @@ async function loadData(){
   }
 }
 
-/* ═══════════ 목록 & 검색 ═══════════ */
+/* ═══════════ 목록 & 검색 & 최근 본 스토어 ═══════════ */
+const RECENT_KEY = "md_recent_stores";
+function getRecents(){
+  try{ return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); }catch(e){ return []; }
+}
+function addRecent(id){
+  const list = [id, ...getRecents().filter(x=>x!==id)].slice(0, 5);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+}
+
+function rowHtml(s){
+  return `
+    <div class="store-row" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
+      <div class="thumb">${escapeHtml((s.name||"?").trim().charAt(0))}</div>
+      <div class="info">
+        <div class="name">${escapeHtml(s.name || "(상호명 없음)")}</div>
+        <div class="meta">ID ${escapeHtml(s.id)} · 메뉴 ${menuCount(s)}개${s.updatedAt ? " · " + escapeHtml(s.updatedAt.slice(5,10).replace("-",".")) + " 업데이트" : ""}</div>
+      </div>
+      <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+    </div>`;
+}
+function bindRows(container){
+  container.querySelectorAll(".store-row").forEach(el=>{
+    el.addEventListener("click", ()=>openDetail(el.dataset.id));
+    el.addEventListener("keydown", e=>{ if(e.key==="Enter") openDetail(el.dataset.id); });
+  });
+}
+
 function renderList(){
   const q = $("search-input").value.trim().toLowerCase();
   const filtered = q
     ? stores.filter(s => s.id.toLowerCase().includes(q) || (s.name||"").toLowerCase().includes(q))
     : stores;
+
+  // 최근 본 스토어 (검색 중이 아닐 때만)
+  const recents = q ? [] : getRecents().map(id=>stores.find(s=>s.id===id)).filter(Boolean);
+  $("recent-sec").innerHTML = recents.length
+    ? `<div class="band"><span>최근 본 스토어</span><span class="tag">${recents.length}개</span></div>` +
+      recents.map(rowHtml).join("")
+    : "";
+  bindRows($("recent-sec"));
 
   $("band-label").textContent = q ? "검색 결과" : "전체 스토어";
   $("band-count").textContent = filtered.length + "개";
@@ -359,19 +401,8 @@ function renderList(){
       : '<div class="list-state"><span class="emoji">🔍</span>검색 결과가 없어요<br>스토어 ID나 상호명을 다시 확인해주세요</div>';
     return;
   }
-  $("store-list").innerHTML = filtered.slice(0, 200).map(s=>`
-    <div class="store-row" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
-      <div class="thumb">${escapeHtml((s.name||"?").trim().charAt(0))}</div>
-      <div class="info">
-        <div class="name">${escapeHtml(s.name || "(상호명 없음)")}</div>
-        <div class="meta">ID ${escapeHtml(s.id)} · 메뉴 ${menuCount(s)}개${s.updatedAt ? " · " + escapeHtml(s.updatedAt.slice(5,10).replace("-",".")) + " 업데이트" : ""}</div>
-      </div>
-      <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
-    </div>`).join("");
-  $("store-list").querySelectorAll(".store-row").forEach(el=>{
-    el.addEventListener("click", ()=>openDetail(el.dataset.id));
-    el.addEventListener("keydown", e=>{ if(e.key==="Enter") openDetail(el.dataset.id); });
-  });
+  $("store-list").innerHTML = filtered.slice(0, 200).map(rowHtml).join("");
+  bindRows($("store-list"));
 }
 $("search-input").addEventListener("input", renderList);
 
@@ -432,6 +463,7 @@ document.addEventListener("visibilitychange", ()=>{
 function openDetail(id){
   currentStore = stores.find(s=>s.id===id);
   if(!currentStore) return;
+  addRecent(id);
   $("d-title").textContent = currentStore.name || "(상호명 없음)";
   $("d-name").textContent = currentStore.name || "(상호명 없음)";
   $("d-meta").innerHTML =

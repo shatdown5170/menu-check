@@ -91,6 +91,16 @@
   .btn-primary:disabled{opacity:.4;cursor:default;}
   .btn-ghost{width:100%;padding:12px;font-size:14px;font-weight:700;color:var(--gray2);background:var(--pill);border:none;border-radius:var(--radius);cursor:pointer;margin-top:8px;}
 
+  /* 스토어 목록·삭제 */
+  #manage-list{margin-top:12px;border-top:1px solid var(--line);}
+  .mg-row{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line);}
+  .mg-row .mg-info{flex:1;min-width:0;font-size:13.5px;}
+  .mg-row .mg-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mg-row .mg-meta{font-size:12px;color:var(--gray);margin-top:1px;}
+  .mg-del{background:var(--red-bg);color:var(--red-fg);border:none;border-radius:8px;padding:8px 14px;
+    font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;}
+  .mg-empty{padding:14px 2px;font-size:13px;color:var(--gray);}
+
   .stats{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
   .stat{flex:1;min-width:90px;background:var(--pill);border-radius:10px;padding:10px 12px;text-align:center;}
   .stat .v{font-size:20px;font-weight:800;}
@@ -156,6 +166,8 @@
   <div class="card">
     <h3>📊 현재 등록 현황</h3>
     <div id="status-line">불러오는 중…</div>
+    <button class="btn-ghost" id="btn-manage">🗂 스토어 목록 보기 · 삭제</button>
+    <div id="manage-list" class="hidden"></div>
   </div>
 
   <!-- 입력 -->
@@ -295,7 +307,9 @@ async function gateSubmit(){
 $("gate-btn").addEventListener("click", gateSubmit);
 $("gate-input").addEventListener("keydown", e=>{ if(e.key==="Enter") gateSubmit(); });
 
-/* ═══════════ 현재 상태 ═══════════ */
+/* ═══════════ 현재 상태 + 스토어 목록·삭제 ═══════════ */
+let adminStores = [];
+
 async function loadStatus(){
   try{
     const r = await fetch(SERVER_URL + "/menu-desc/data", { headers: { "x-access-key": getKey() } });
@@ -306,16 +320,65 @@ async function loadStatus(){
     }
     const d = await r.json();
     if(!r.ok) throw new Error(d.error || r.status);
-    const stores = d.stores || [];
-    const menus = stores.reduce((a,s)=>a + s.groups.reduce((x,g)=>x+g.menus.length,0), 0);
-    const latest = stores.map(s=>s.updatedAt||"").sort().pop() || "";
+    adminStores = (d.stores || []).sort((a,b)=> (b.updatedAt||"").localeCompare(a.updatedAt||""));
+    const menus = adminStores.reduce((a,s)=>a + s.groups.reduce((x,g)=>x+g.menus.length,0), 0);
+    const latest = adminStores.map(s=>s.updatedAt||"").sort().pop() || "";
     $("status-line").innerHTML =
-      `등록된 스토어 <b>${stores.length}개</b> · 메뉴 <b>${menus}개</b>` +
+      `등록된 스토어 <b>${adminStores.length}개</b> · 메뉴 <b>${menus}개</b>` +
       (latest ? ` · 마지막 업로드 <b>${escapeHtml(latest.slice(0,16))}</b>` : "");
+    renderManageList();
   }catch(e){
     $("status-line").textContent = "현황을 불러오지 못했습니다: " + (e.message || e);
   }
 }
+
+function renderManageList(){
+  const box = $("manage-list");
+  if(box.classList.contains("hidden")) return;
+  if(adminStores.length === 0){
+    box.innerHTML = '<div class="mg-empty">등록된 스토어가 없습니다.</div>';
+    return;
+  }
+  box.innerHTML = adminStores.map(s=>{
+    const n = s.groups.reduce((a,g)=>a+g.menus.length,0);
+    return `<div class="mg-row">
+      <div class="mg-info">
+        <div class="mg-name">${escapeHtml(s.name || "(상호명 없음)")}</div>
+        <div class="mg-meta">ID ${escapeHtml(s.id)} · 메뉴 ${n}개${s.updatedAt ? " · " + escapeHtml(s.updatedAt.slice(0,10)) : ""}</div>
+      </div>
+      <button class="mg-del" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name||s.id)}" data-n="${n}">삭제</button>
+    </div>`;
+  }).join("");
+  box.querySelectorAll(".mg-del").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const { id, name, n } = btn.dataset;
+      if(!confirm(`'${name}' 스토어의 메뉴 설명 ${n}개를 삭제할까요?\n삭제하면 되돌릴 수 없습니다.`)) return;
+      busy(true, "삭제 중…");
+      try{
+        const r = await fetch(SERVER_URL + "/menu-desc/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-access-key": getKey() },
+          body: JSON.stringify({ storeId: id }),
+        });
+        const d = await r.json();
+        if(!r.ok) throw new Error(d.error || "HTTP " + r.status);
+        toast(`🗑 '${name}' 삭제 완료`);
+        loadStatus();
+      }catch(e){
+        toast("삭제 실패: " + (e.message || e));
+      }finally{
+        busy(false);
+      }
+    });
+  });
+}
+
+$("btn-manage").addEventListener("click", ()=>{
+  const box = $("manage-list");
+  box.classList.toggle("hidden");
+  $("btn-manage").textContent = box.classList.contains("hidden") ? "🗂 스토어 목록 보기 · 삭제" : "🗂 스토어 목록 닫기";
+  renderManageList();
+});
 
 /* ═══════════ 탭 전환 ═══════════ */
 function switchTab(tab){

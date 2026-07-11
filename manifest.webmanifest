@@ -1,0 +1,16 @@
+{
+  "name": "메뉴 설명 조회",
+  "short_name": "메뉴설명",
+  "description": "쿠팡이츠 스토어별 AI 메뉴 설명 조회·저장",
+  "start_url": "./menu-desc.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "lang": "ko",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

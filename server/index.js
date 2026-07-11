@@ -427,6 +427,32 @@ app.post("/menu-desc/upload", async (req, res) => {
   }
 });
 
+// 스토어 삭제 — 해당 스토어ID의 모든 행 제거 (관리자만)
+app.post("/menu-desc/delete", async (req, res) => {
+  try {
+    if (!requireConfig(res)) return;
+    if (roleOf(req) !== "admin") return res.status(401).json({ error: "관리자 비밀번호가 올바르지 않습니다." });
+
+    const storeId = String(req.body?.storeId ?? "").trim();
+    if (!storeId) return res.status(400).json({ error: "storeId가 필요합니다." });
+
+    const existing = await readAllRows();
+    const kept = existing.filter((r) => r.storeId !== storeId);
+    if (kept.length === existing.length) {
+      return res.status(404).json({ error: "해당 스토어ID의 데이터가 없습니다." });
+    }
+    await writeAllRows(kept);
+    res.json({
+      ok: true,
+      deletedRows: existing.length - kept.length,
+      totalStores: new Set(kept.map((r) => r.storeId)).size,
+    });
+  } catch (e) {
+    console.error("menu-desc/delete error:", e);
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
 // Cloud Run은 PORT 환경변수로 포트를 주입함 (기본 8080).
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
