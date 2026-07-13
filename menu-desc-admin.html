@@ -96,8 +96,16 @@
   .btn-ghost{width:100%;padding:12px;font-size:14px;font-weight:700;color:var(--gray2);background:var(--pill);border:none;border-radius:var(--radius);cursor:pointer;margin-top:8px;}
 
   /* 스토어 목록·삭제 */
-  #manage-list{margin-top:12px;border-top:1px solid var(--line);}
-  .mg-row{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line);}
+  #manage-list{margin-top:12px;border-top:1px solid var(--line);padding-top:12px;}
+  .mg-search{display:flex;align-items:center;gap:8px;border:1.5px solid var(--line2);border-radius:10px;
+    padding:9px 12px;margin-bottom:8px;color:#B0B8C1;}
+  .mg-search:focus-within{border-color:var(--blue);}
+  .mg-search input{border:none;outline:none;background:none;flex:1;min-width:0;font-size:14px;color:var(--ink);font-family:inherit;}
+  /* 최대 10칸 높이로 고정하고 그 안에서 스크롤 */
+  #mg-scroll{max-height:min(600px,62vh);overflow-y:auto;-webkit-overflow-scrolling:touch;
+    border:1px solid var(--line);border-radius:10px;}
+  .mg-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--line);}
+  #mg-scroll .mg-row:last-child{border-bottom:none;}
   .mg-row .mg-info{flex:1;min-width:0;font-size:13.5px;}
   .mg-row .mg-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .mg-row .mg-meta{font-size:12px;color:var(--gray);margin-top:1px;}
@@ -367,7 +375,29 @@ function renderManageList(){
     box.innerHTML = '<div class="mg-empty">등록된 스토어가 없습니다.</div>';
     return;
   }
-  box.innerHTML = adminStores.map(s=>{
+  // 셸(검색창 + 고정 높이 스크롤 박스)은 한 번만 만들어 검색 입력 포커스를 유지
+  if(!$("mg-scroll")){
+    box.innerHTML =
+      `<div class="mg-search">` +
+      `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>` +
+      `<input id="mg-search-input" type="search" placeholder="스토어 ID · 상호명 검색" autocomplete="off"></div>` +
+      `<div id="mg-scroll"></div>`;
+    $("mg-search-input").addEventListener("input", renderMgRows);
+  }
+  renderMgRows();
+}
+
+function renderMgRows(){
+  const q = ($("mg-search-input") ? $("mg-search-input").value : "").trim().toLowerCase();
+  const list = q
+    ? adminStores.filter(s => s.id.toLowerCase().includes(q) || (s.name||"").toLowerCase().includes(q))
+    : adminStores;
+  const scroll = $("mg-scroll");
+  if(list.length === 0){
+    scroll.innerHTML = '<div class="mg-empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+  scroll.innerHTML = list.map(s=>{
     const n = s.groups.reduce((a,g)=>a+g.menus.length,0);
     return `<div class="mg-row">
       <div class="mg-info">
@@ -378,13 +408,13 @@ function renderManageList(){
       <button class="mg-del" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name||s.id)}" data-n="${n}">삭제</button>
     </div>`;
   }).join("");
-  box.querySelectorAll(".mg-edit").forEach(btn=>{
+  scroll.querySelectorAll(".mg-edit").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const s = adminStores.find(x=>x.id===btn.dataset.id);
       if(s) startEdit(s);
     });
   });
-  box.querySelectorAll(".mg-del").forEach(btn=>{
+  scroll.querySelectorAll(".mg-del").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
       const { id, name, n } = btn.dataset;
       if(!confirm(`'${name}' 스토어의 메뉴 설명 ${n}개를 삭제할까요?\n삭제하면 되돌릴 수 없습니다.`)) return;
