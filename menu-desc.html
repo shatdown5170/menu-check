@@ -95,6 +95,12 @@
   .band{background:var(--band);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;
     font-size:14.5px;font-weight:700;letter-spacing:-.2px;}
   .band .tag{font-size:12.5px;font-weight:700;color:var(--orange);}
+  .band .b-left{display:flex;align-items:center;gap:7px;}
+  .band.toggle{cursor:pointer;-webkit-user-select:none;user-select:none;}
+  .band.toggle:active{background:var(--pill-on,#EDEEF0);}
+  .band .caret{color:var(--sub);transition:transform .18s;flex-shrink:0;}
+  .band.collapsed .caret{transform:rotate(-90deg);}
+  @media (prefers-reduced-motion: reduce){ .band .caret{transition:none;} }
 
   .store-row{display:flex;align-items:center;gap:14px;padding:17px 20px;cursor:pointer;border-bottom:1px solid var(--line);}
   .store-row:active{background:var(--band);}
@@ -211,7 +217,13 @@
       </div>
       <div class="scroll" id="list-scroll">
         <div id="recent-sec"></div>
-        <div class="band"><span id="band-label">전체 스토어</span><span class="tag" id="band-count"></span></div>
+        <div class="band toggle" id="band-all" role="button" tabindex="0">
+          <span class="b-left">
+            <svg class="caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            <span id="band-label">전체 스토어</span>
+          </span>
+          <span class="tag" id="band-count"></span>
+        </div>
         <div id="store-list"><div class="list-state">데이터를 불러오는 중…</div></div>
       </div>
     </div>
@@ -378,22 +390,44 @@ function bindRows(container){
   });
 }
 
+// 섹션 접기/펼치기 상태 (기기에 기억)
+const COLLAPSE_KEY = "md_collapsed";
+function collapsedState(){
+  try{ return JSON.parse(localStorage.getItem(COLLAPSE_KEY) || "{}"); }catch(e){ return {}; }
+}
+function toggleCollapsed(key){
+  const c = collapsedState();
+  c[key] = !c[key];
+  localStorage.setItem(COLLAPSE_KEY, JSON.stringify(c));
+  renderList();
+}
+const CARET_SVG = '<svg class="caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
 function renderList(){
   const q = $("search-input").value.trim().toLowerCase();
   const filtered = q
     ? stores.filter(s => s.id.toLowerCase().includes(q) || (s.name||"").toLowerCase().includes(q))
     : stores;
+  const col = collapsedState();
 
-  // 최근 본 스토어 (검색 중이 아닐 때만)
-  const recents = q ? [] : getRecents().map(id=>stores.find(s=>s.id===id)).filter(Boolean);
-  $("recent-sec").innerHTML = recents.length
-    ? `<div class="band"><span>최근 본 스토어</span><span class="tag">${recents.length}개</span></div>` +
-      recents.map(rowHtml).join("")
-    : "";
-  bindRows($("recent-sec"));
+  // 최근 본 스토어 — 최대 5개, 검색 중에는 숨김
+  const recents = q ? [] : getRecents().slice(0, 5).map(id=>stores.find(s=>s.id===id)).filter(Boolean);
+  if(recents.length){
+    const rc = !!col.recent;
+    $("recent-sec").innerHTML =
+      `<div class="band toggle${rc ? " collapsed" : ""}" id="band-recent" role="button" tabindex="0">` +
+      `<span class="b-left">${CARET_SVG}<span>최근 본 스토어</span></span><span class="tag">${recents.length}개</span></div>` +
+      (rc ? "" : recents.map(rowHtml).join(""));
+    $("band-recent").addEventListener("click", ()=>toggleCollapsed("recent"));
+    bindRows($("recent-sec"));
+  }else{
+    $("recent-sec").innerHTML = "";
+  }
 
   $("band-label").textContent = q ? "검색 결과" : "전체 스토어";
   $("band-count").textContent = filtered.length + "개";
+  const allCollapsed = !q && !!col.all; // 검색 중에는 항상 펼침
+  $("band-all").classList.toggle("collapsed", allCollapsed);
 
   if(filtered.length === 0){
     $("store-list").innerHTML = stores.length === 0
@@ -401,10 +435,18 @@ function renderList(){
       : '<div class="list-state"><span class="emoji">🔍</span>검색 결과가 없어요<br>스토어 ID나 상호명을 다시 확인해주세요</div>';
     return;
   }
+  if(allCollapsed){
+    $("store-list").innerHTML = "";
+    return;
+  }
   $("store-list").innerHTML = filtered.slice(0, 200).map(rowHtml).join("");
   bindRows($("store-list"));
 }
 $("search-input").addEventListener("input", renderList);
+$("band-all").addEventListener("click", ()=>{
+  if($("search-input").value.trim()) return; // 검색 결과는 접지 않음
+  toggleCollapsed("all");
+});
 
 /* ═══════════ 당겨서 새로고침 ═══════════ */
 let lastFetch = 0;
