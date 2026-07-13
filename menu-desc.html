@@ -110,6 +110,7 @@
   .store-row .name{font-size:16px;font-weight:700;letter-spacing:-.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .store-row .meta{font-size:12.5px;color:var(--sub);margin-top:3px;}
   .store-row .chev{color:#C4CAD4;flex-shrink:0;}
+  .list-hint{padding:16px 20px 24px;text-align:center;color:var(--sub);font-size:12.5px;}
   .list-state{padding:64px 20px;text-align:center;color:var(--sub);font-size:14px;line-height:1.7;}
   .list-state .emoji{font-size:38px;display:block;margin-bottom:10px;}
   .list-state button{margin-top:14px;padding:11px 22px;font-size:14px;font-weight:700;color:var(--ink);
@@ -424,12 +425,19 @@ function renderList(){
     $("recent-sec").innerHTML = "";
   }
 
-  $("band-label").textContent = q ? "검색 결과" : "전체 스토어";
-  $("band-count").textContent = filtered.length + "개";
-  const allCollapsed = !q && !!col.all; // 검색 중에는 항상 펼침
+  // 검색 중이 아니면 '최근 업로드 스토어' 최신 10개, 검색하면 전체에서 결과
+  const RECENT_UPLOAD_N = 10;
+  const isSearch = !!q;
+  const displayList = isSearch ? filtered.slice(0, 200) : stores.slice(0, RECENT_UPLOAD_N);
+
+  $("band-label").textContent = isSearch ? "검색 결과" : "최근 업로드 스토어";
+  $("band-count").textContent = isSearch
+    ? filtered.length + "개"
+    : (stores.length > RECENT_UPLOAD_N ? `최신 ${RECENT_UPLOAD_N}개 · 전체 ${stores.length}개` : stores.length + "개");
+  const allCollapsed = !isSearch && !!col.all; // 검색 중에는 항상 펼침
   $("band-all").classList.toggle("collapsed", allCollapsed);
 
-  if(filtered.length === 0){
+  if(displayList.length === 0){
     $("store-list").innerHTML = stores.length === 0
       ? '<div class="list-state"><span class="emoji">📭</span>아직 업로드된 데이터가 없습니다</div>'
       : '<div class="list-state"><span class="emoji">🔍</span>검색 결과가 없어요<br>스토어 ID나 상호명을 다시 확인해주세요</div>';
@@ -439,7 +447,9 @@ function renderList(){
     $("store-list").innerHTML = "";
     return;
   }
-  $("store-list").innerHTML = filtered.slice(0, 200).map(rowHtml).join("");
+  $("store-list").innerHTML = displayList.map(rowHtml).join("") +
+    (!isSearch && stores.length > RECENT_UPLOAD_N
+      ? '<div class="list-hint">더 많은 스토어는 위 검색창에서 이름·ID로 찾을 수 있어요</div>' : "");
   bindRows($("store-list"));
 }
 $("search-input").addEventListener("input", renderList);

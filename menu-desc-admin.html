@@ -190,12 +190,12 @@
       <button id="edit-cancel">신규 등록으로 전환</button>
     </div>
     <div class="tabs">
-      <button id="tab-ai" class="on">🤖 AI 텍스트 붙여넣기</button>
-      <button id="tab-x">📑 엑셀 3열 붙여넣기</button>
+      <button id="tab-x" class="on">📑 엑셀 3열 붙여넣기</button>
+      <button id="tab-ai">🤖 AI 텍스트 붙여넣기</button>
     </div>
 
     <!-- AI 텍스트 탭 -->
-    <div class="tab-panel show" id="panel-ai">
+    <div class="tab-panel" id="panel-ai">
       <div class="field-row">
         <div class="field">
           <label>스토어 ID *</label>
@@ -215,7 +215,7 @@
     </div>
 
     <!-- 엑셀 3열 탭 -->
-    <div class="tab-panel" id="panel-x">
+    <div class="tab-panel show" id="panel-x">
       <div class="field-row">
         <div class="field">
           <label>스토어 ID *</label>
@@ -284,7 +284,7 @@ const SERVER_URL = "https://menu-check-564449764059.asia-northeast3.run.app";
 const KEY_STORAGE = "md_admin_key";
 
 let parsedRows = [];   // [{storeId,storeName,kind:'소개'|'그룹'|'메뉴',name,desc}] 순서 유지
-let activeTab = "ai";
+let activeTab = "x";   // 기본 탭: 엑셀 3열 붙여넣기
 let editingId = null;  // 수정 중인 스토어ID (null이면 신규 등록)
 const $ = (id)=>document.getElementById(id);
 
