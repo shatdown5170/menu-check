@@ -101,8 +101,16 @@
   .mg-row .mg-info{flex:1;min-width:0;font-size:13.5px;}
   .mg-row .mg-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .mg-row .mg-meta{font-size:12px;color:var(--gray);margin-top:1px;}
+  .mg-edit{background:var(--blue-soft);color:var(--blue);border:none;border-radius:8px;padding:8px 14px;
+    font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;}
   .mg-del{background:var(--red-bg);color:var(--red-fg);border:none;border-radius:8px;padding:8px 14px;
     font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;}
+  .edit-banner{display:none;background:var(--blue-soft);color:var(--blue);border:1px solid #A9DFF9;
+    border-radius:10px;padding:10px 13px;font-size:13px;font-weight:700;margin-bottom:12px;
+    align-items:center;justify-content:space-between;gap:10px;}
+  .edit-banner.show{display:flex;}
+  .edit-banner button{background:transparent;border:none;color:var(--blue);font-size:12.5px;font-weight:700;
+    text-decoration:underline;cursor:pointer;font-family:inherit;flex-shrink:0;}
   .mg-empty{padding:14px 2px;font-size:13px;color:var(--gray);}
 
   .stats{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
@@ -177,9 +185,13 @@
   <!-- 입력 -->
   <div class="card" id="input-card">
     <h3>1️⃣ 데이터 입력</h3>
+    <div class="edit-banner" id="edit-banner">
+      <span id="edit-banner-text"></span>
+      <button id="edit-cancel">신규 등록으로 전환</button>
+    </div>
     <div class="tabs">
       <button id="tab-ai" class="on">🤖 AI 텍스트 붙여넣기</button>
-      <button id="tab-x">📑 엑셀 4열 붙여넣기</button>
+      <button id="tab-x">📑 엑셀 3열 붙여넣기</button>
     </div>
 
     <!-- AI 텍스트 탭 -->
@@ -202,13 +214,24 @@
       <textarea id="ai-paste" placeholder="예시:&#10;&#10;[대표 세트 및 식사류]&#10;다채로운 소고기 부위를 모은 세트부터 든든하게 채우는 한 끼 식사 메뉴까지 준비되어 있습니다.&#10;&#10;육전 갈비탕&#10;오랜 시간 고아낸 깊고 진한 국물의 보양 갈비탕에 고소한 소고기 육전을 얹었습니다.&#10;&#10;보양 갈비탕&#10;오랜 시간 푹 고아내 깊고 진한 국물에 두 개의 뼈대가 들어간 보양 갈비탕입니다."></textarea>
     </div>
 
-    <!-- 엑셀 4열 탭 -->
+    <!-- 엑셀 3열 탭 -->
     <div class="tab-panel" id="panel-x">
-      <div class="hint">
-        컬럼 순서: <code>스토어ID</code> <code>스토어명</code> <code>메뉴명</code> <code>메뉴설명</code><br>
-        엑셀에서 해당 4개 열을 선택해 복사한 뒤 아래에 붙여넣으세요. 여러 스토어 동시 업로드 가능. (첫 줄이 제목 행이면 자동으로 건너뜁니다)
+      <div class="field-row">
+        <div class="field">
+          <label>스토어 ID *</label>
+          <input id="x-store-id" inputmode="numeric" autocomplete="off" placeholder="예: 123456">
+        </div>
+        <div class="field">
+          <label>스토어명 *</label>
+          <input id="x-store-name" autocomplete="off" placeholder="예: 모던식당 강남점">
+        </div>
       </div>
-      <textarea id="x-paste" placeholder="여기에 엑셀 내용을 붙여넣기 (Ctrl+V)&#10;&#10;예시:&#10;12345	모던식당	김치찌개	묵은지와 두툼한 돼지고기를 넣고 끓여낸…&#10;12345	모던식당	제육볶음	매콤달콤한 양념에 볶아낸…"></textarea>
+      <div class="hint">
+        컬럼 순서: <code>구분</code> <code>이름</code> <code>설명</code> — 엑셀에서 3개 열을 복사해 붙여넣으세요.<br>
+        · 구분: <code>디쉬그룹</code> 또는 <code>디쉬</code> (매장 소개는 <code>소개</code>)<br>
+        · 행 순서 그대로 표시되며, 디쉬는 바로 위 디쉬그룹에 소속됩니다. (첫 줄이 제목 행이면 자동으로 건너뜁니다)
+      </div>
+      <textarea id="x-paste" placeholder="여기에 엑셀 내용을 붙여넣기 (Ctrl+V)&#10;&#10;예시:&#10;디쉬그룹	대표 세트 및 식사류	다채로운 소고기 부위를 모은 세트 메뉴입니다.&#10;디쉬	육전 갈비탕	오랜 시간 고아낸 깊고 진한 국물의 갈비탕입니다.&#10;디쉬	보양 갈비탕	두 개의 뼈대가 들어간 보양 갈비탕입니다."></textarea>
       <div class="or">또는</div>
       <div class="file-row">
         <label class="file-btn" for="file-input">📁 CSV/TSV 파일 선택</label>
@@ -236,7 +259,7 @@
     <div class="pv-struct hidden" id="pv-struct"></div>
     <div class="tbl-scroll hidden" id="pv-table-wrap">
       <table>
-        <thead><tr><th>스토어ID</th><th>스토어명</th><th>메뉴명</th><th>메뉴설명</th></tr></thead>
+        <thead><tr><th>구분</th><th>이름</th><th>설명</th></tr></thead>
         <tbody id="pv-tbody"></tbody>
       </table>
     </div>
@@ -262,6 +285,7 @@ const KEY_STORAGE = "md_admin_key";
 
 let parsedRows = [];   // [{storeId,storeName,kind:'소개'|'그룹'|'메뉴',name,desc}] 순서 유지
 let activeTab = "ai";
+let editingId = null;  // 수정 중인 스토어ID (null이면 신규 등록)
 const $ = (id)=>document.getElementById(id);
 
 function toast(msg){
@@ -350,9 +374,16 @@ function renderManageList(){
         <div class="mg-name">${escapeHtml(s.name || "(상호명 없음)")}</div>
         <div class="mg-meta">ID ${escapeHtml(s.id)} · 메뉴 ${n}개${s.updatedAt ? " · " + escapeHtml(s.updatedAt.slice(0,10)) : ""}</div>
       </div>
+      <button class="mg-edit" data-id="${escapeHtml(s.id)}">수정</button>
       <button class="mg-del" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name||s.id)}" data-n="${n}">삭제</button>
     </div>`;
   }).join("");
+  box.querySelectorAll(".mg-edit").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const s = adminStores.find(x=>x.id===btn.dataset.id);
+      if(s) startEdit(s);
+    });
+  });
   box.querySelectorAll(".mg-del").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
       const { id, name, n } = btn.dataset;
@@ -395,6 +426,46 @@ function switchTab(tab){
 }
 $("tab-ai").addEventListener("click", ()=>switchTab("ai"));
 $("tab-x").addEventListener("click", ()=>switchTab("x"));
+
+/* ═══════════ 스토어 수정 ═══════════
+   기존 스토어의 구조를 AI 텍스트 형식으로 되돌려 편집란에 로드.
+   같은 스토어ID로 다시 업로드하면 교체되므로 수정이 된다. */
+function storeToAiText(s){
+  const parts = [];
+  if(s.intro) parts.push("디쉬그룹 설명\n" + s.intro);
+  for(const g of s.groups){
+    if(g.name || g.desc){
+      parts.push("[" + (g.name || "기타") + "]" + (g.desc ? "\n" + g.desc : ""));
+    }
+    for(const m of g.menus){
+      parts.push(m.name + (m.desc ? "\n" + m.desc : ""));
+    }
+  }
+  return parts.join("\n\n");
+}
+
+function startEdit(s){
+  editingId = s.id;
+  switchTab("ai");
+  $("ai-store-id").value = s.id;
+  $("ai-store-name").value = s.name || "";
+  $("ai-paste").value = storeToAiText(s);
+  $("edit-banner-text").textContent = `✏️ '${s.name || s.id}' 수정 중 — 내용을 고친 뒤 [데이터 확인]`;
+  $("edit-banner").classList.add("show");
+  $("preview-card").classList.add("hidden");
+  $("result-card").classList.add("hidden");
+  $("input-card").scrollIntoView({ behavior:"smooth" });
+  toast("불러왔어요. 수정 후 [데이터 확인]을 누르세요");
+}
+
+function exitEdit(){
+  editingId = null;
+  $("edit-banner").classList.remove("show");
+  $("ai-paste").value = "";
+  $("ai-store-id").value = "";
+  $("ai-store-name").value = "";
+}
+$("edit-cancel").addEventListener("click", exitEdit);
 
 /* ═══════════ AI 텍스트 파서 ═══════════
    · 빈 줄로 블록 구분
@@ -534,30 +605,18 @@ $("btn-parse").addEventListener("click", ()=>{
   else parseExcelTab();
 });
 
-function parseAiTab(){
-  const storeId = $("ai-store-id").value.trim();
-  const storeName = $("ai-store-name").value.trim();
-  const text = $("ai-paste").value.trim();
-  if(!storeId){ toast("스토어 ID를 입력해주세요"); $("ai-store-id").focus(); return; }
-  if(!storeName){ toast("스토어명을 입력해주세요"); $("ai-store-name").focus(); return; }
-  if(!text){ toast("AI 메뉴 설명 텍스트를 붙여넣어주세요"); return; }
-
-  const { rows, warnings } = parseAiText(text);
-  const menus = rows.filter(r=>r.kind==="메뉴");
-  if(menus.length === 0){
-    toast("메뉴를 하나도 인식하지 못했습니다. 형식을 확인해주세요");
-    return;
-  }
-  parsedRows = rows.map(r=>({ storeId, storeName, ...r }));
-
-  $("pv-stores").textContent = 1;
-  $("pv-groups").textContent = rows.filter(r=>r.kind==="그룹").length;
-  $("pv-menus").textContent = menus.length;
+// 구조(소개/그룹/메뉴) 미리보기 — AI 탭과 엑셀 탭 공통
+function renderStructPreview(rows, storeN, warnings){
+  const menuN = rows.filter(r=>r.kind==="메뉴").length;
+  const groupN = rows.filter(r=>r.kind==="그룹").length;
+  $("pv-stores").textContent = storeN;
+  $("pv-groups").textContent = groupN;
+  $("pv-menus").textContent = menuN;
   $("pv-errors").textContent = warnings.length;
   $("pv-errbox").classList.toggle("hidden", warnings.length===0);
-  $("pv-errbox").innerHTML = warnings.slice(0,30).map(escapeHtml).join("<br>");
+  $("pv-errbox").innerHTML = warnings.slice(0,30).map(escapeHtml).join("<br>") +
+    (warnings.length>30 ? `<br>…외 ${warnings.length-30}건` : "");
 
-  // 구조 미리보기
   let html = "";
   let n = 0;
   const intro = rows.find(r=>r.kind==="소개");
@@ -578,54 +637,73 @@ function parseAiTab(){
   showPreview();
 }
 
-function parseExcelTab(){
-  const text = ($("x-paste").value.trim() || fileText).trim();
-  if(!text){
-    toast("붙여넣기 또는 파일 선택으로 데이터를 먼저 입력해주세요");
+function parseAiTab(){
+  const storeId = $("ai-store-id").value.trim();
+  const storeName = $("ai-store-name").value.trim();
+  const text = $("ai-paste").value.trim();
+  if(!storeId){ toast("스토어 ID를 입력해주세요"); $("ai-store-id").focus(); return; }
+  if(!storeName){ toast("스토어명을 입력해주세요"); $("ai-store-name").focus(); return; }
+  if(!text){ toast("AI 메뉴 설명 텍스트를 붙여넣어주세요"); return; }
+
+  const { rows, warnings } = parseAiText(text);
+  if(rows.filter(r=>r.kind==="메뉴").length === 0){
+    toast("메뉴를 하나도 인식하지 못했습니다. 형식을 확인해주세요");
     return;
   }
+  parsedRows = rows.map(r=>({ storeId, storeName, ...r }));
+  renderStructPreview(parsedRows, 1, warnings);
+}
+
+// A열 '구분' 값 → 내부 종류. 디쉬그룹/디쉬/소개(및 유사표현) 인식
+function mapKind(v){
+  const s = String(v||"").replace(/\s/g,"");
+  if(/^(디쉬그룹|디쉬그룹명|그룹|그룹명|dishgroup|group)$/i.test(s)) return "그룹";
+  if(/^(소개|매장소개|스토어소개|intro)$/i.test(s)) return "소개";
+  if(/^(디쉬|디쉬명|메뉴|메뉴명|dish|menu)$/i.test(s)) return "메뉴";
+  return null;
+}
+
+function parseExcelTab(){
+  const storeId = $("x-store-id").value.trim();
+  const storeName = $("x-store-name").value.trim();
+  const text = ($("x-paste").value.trim() || fileText).trim();
+  if(!storeId){ toast("스토어 ID를 입력해주세요"); $("x-store-id").focus(); return; }
+  if(!storeName){ toast("스토어명을 입력해주세요"); $("x-store-name").focus(); return; }
+  if(!text){ toast("붙여넣기 또는 파일 선택으로 데이터를 먼저 입력해주세요"); return; }
+
   const raw = parseDelimited(text).filter(r => r.some(c => String(c).trim() !== ""));
   if(raw.length === 0){ toast("읽을 수 있는 행이 없습니다"); return; }
 
-  let start = 0;
-  if(looksLikeHeader(raw[0])) start = 1;
-
-  parsedRows = [];
+  const rows = [];
   const errors = [];
-  for(let i=start; i<raw.length; i++){
+  for(let i=0; i<raw.length; i++){
     const cols = raw[i].map(c=>String(c).trim());
-    const [storeId, storeName, menuName, ...rest] = cols;
+    const [gubun, name, ...rest] = cols;
     const desc = rest.join(" ").trim();
-    if(!storeId || !menuName){
-      errors.push(`${i+1}행: ${!storeId ? "스토어ID 없음" : "메뉴명 없음"} — "${cols.slice(0,3).join(" | ").slice(0,50)}"`);
+    const kind = mapKind(gubun);
+    if(kind === null){
+      // 첫 줄이 제목 행(예: '디쉬 / 디쉬 그룹 구분')이면 조용히 건너뜀
+      if(i === 0 && /구분|그룹|디쉬|설명|명|kind|name|desc/i.test(cols.join(" "))) continue;
+      errors.push(`${i+1}행: '구분'이 디쉬그룹/디쉬/소개 중 하나가 아님 — "${(gubun||"").slice(0,20)}"`);
       continue;
     }
-    parsedRows.push({ storeId, storeName: storeName||"", kind:"메뉴", name: menuName, desc });
+    if(kind !== "소개" && !name){
+      errors.push(`${i+1}행: 이름(B열)이 비어 있음`);
+      continue;
+    }
+    if((kind === "소개" || kind === "그룹") && !desc){
+      // 그룹은 설명이 없어도 되지만 소개는 설명이 핵심
+      if(kind === "소개"){ errors.push(`${i+1}행: 소개 설명(C열)이 비어 있음`); continue; }
+    }
+    rows.push({ storeId, storeName, kind, name: name || "", desc });
   }
-  if(parsedRows.length === 0){
-    toast("유효한 행이 없습니다. 컬럼 순서를 확인해주세요");
+  if(rows.filter(r=>r.kind==="메뉴").length === 0){
+    toast("메뉴(디쉬)를 하나도 인식하지 못했습니다. 구분 값과 열 순서를 확인해주세요");
+    if(errors.length){ $("pv-errbox").classList.remove("hidden"); $("pv-errbox").innerHTML = errors.slice(0,10).map(escapeHtml).join("<br>"); }
     return;
   }
-
-  $("pv-stores").textContent = new Set(parsedRows.map(r=>r.storeId)).size;
-  $("pv-groups").textContent = 0;
-  $("pv-menus").textContent = parsedRows.length;
-  $("pv-errors").textContent = errors.length;
-  $("pv-errbox").classList.toggle("hidden", errors.length === 0);
-  $("pv-errbox").innerHTML = errors.slice(0,30).map(escapeHtml).join("<br>") + (errors.length>30 ? `<br>…외 ${errors.length-30}건` : "");
-
-  const PREVIEW_N = 50;
-  $("pv-tbody").innerHTML = parsedRows.slice(0, PREVIEW_N).map(r=>`
-    <tr>
-      <td>${escapeHtml(r.storeId)}</td>
-      <td>${escapeHtml(r.storeName)}</td>
-      <td>${escapeHtml(r.name)}</td>
-      <td class="desc-cell">${escapeHtml(r.desc.length>80 ? r.desc.slice(0,80)+"…" : r.desc)}</td>
-    </tr>`).join("") +
-    (parsedRows.length > PREVIEW_N ? `<tr><td colspan="4" style="color:var(--gray);">…외 ${parsedRows.length - PREVIEW_N}행</td></tr>` : "");
-  $("pv-table-wrap").classList.remove("hidden");
-  $("pv-struct").classList.add("hidden");
-  showPreview();
+  parsedRows = rows;
+  renderStructPreview(rows, 1, errors);
 }
 
 function showPreview(){
@@ -642,7 +720,8 @@ $("btn-cancel").addEventListener("click", ()=>{
 /* ═══════════ 업로드 ═══════════ */
 $("btn-upload").addEventListener("click", async ()=>{
   if(parsedRows.length === 0) return;
-  busy(true, `${parsedRows.length}행 업로드 중…`);
+  const wasEditing = !!editingId;
+  busy(true, `${parsedRows.length}행 ${wasEditing ? "수정 반영" : "업로드"} 중…`);
   try{
     const r = await fetch(SERVER_URL + "/menu-desc/upload", {
       method: "POST",
@@ -653,16 +732,20 @@ $("btn-upload").addEventListener("click", async ()=>{
     if(!r.ok) throw new Error(d.error || "HTTP " + r.status);
 
     $("result-box").innerHTML =
-      `✅ 업로드 완료!<br>` +
-      `· 이번 업로드: 스토어 <b>${d.uploadedStores}개</b> / 메뉴 <b>${d.uploadedMenus ?? d.uploadedRows}개</b><br>` +
+      `✅ ${wasEditing ? "수정 완료" : "업로드 완료"}!<br>` +
+      `· 이번 ${wasEditing ? "수정" : "업로드"}: 스토어 <b>${d.uploadedStores}개</b> / 메뉴 <b>${d.uploadedMenus ?? d.uploadedRows}개</b><br>` +
       `· 전체 등록: 스토어 <b>${d.totalStores}개</b><br>` +
       `세일즈 조회 페이지에 바로 반영되었습니다.`;
+    $("edit-banner").classList.remove("show");
     $("preview-card").classList.add("hidden");
     $("result-card").classList.remove("hidden");
     $("ai-paste").value = "";
     $("ai-store-id").value = "";
     $("ai-store-name").value = "";
     $("x-paste").value = "";
+    $("x-store-id").value = "";
+    $("x-store-name").value = "";
+    editingId = null;
     fileText = "";
     $("file-name").textContent = "";
     $("file-input").value = "";
