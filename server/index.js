@@ -323,6 +323,22 @@ async function writeAllRows(rows) {
   });
 }
 
+// ── 조회 캐시: 행이 수만 개로 늘어도 매 조회마다 시트 전체를 읽지 않도록 ──
+//    업로드/삭제 시 새 데이터로 즉시 갱신(write-through). 인스턴스가 여러 개면
+//    다른 인스턴스는 최대 TTL만큼 이전 데이터를 보일 수 있음(60초, 허용 범위).
+const DATA_CACHE_TTL_MS = 60 * 1000;
+let dataCache = { rows: null, at: 0 };
+
+async function readAllRowsCached() {
+  if (dataCache.rows && Date.now() - dataCache.at < DATA_CACHE_TTL_MS) return dataCache.rows;
+  const rows = await readAllRows();
+  dataCache = { rows, at: Date.now() };
+  return rows;
+}
+function setCache(rows) {
+  dataCache = { rows, at: Date.now() };
+}
+
 // ── 접근 키 확인: 'admin' | 'view' | null ──
 function roleOf(req) {
   const key = req.get("x-access-key") || "";
@@ -358,7 +374,7 @@ app.get("/menu-desc/data", async (req, res) => {
     if (!requireConfig(res)) return;
     if (!roleOf(req)) return res.status(401).json({ error: "비밀번호가 올바르지 않습니다." });
 
-    const rows = await readAllRows();
+    const rows = await readAllRowsCached();
     const byStore = new Map();
     for (const r of rows) {
       if (!byStore.has(r.storeId)) {
@@ -412,6 +428,7 @@ app.post("/menu-desc/upload", async (req, res) => {
     const kept = existing.filter((r) => !uploadedIds.has(r.storeId));
     const merged = [...kept, ...cleaned.map((r) => ({ ...r, updatedAt: now }))];
     await writeAllRows(merged);
+    setCache(merged);
 
     res.json({
       ok: true,
@@ -442,6 +459,7 @@ app.post("/menu-desc/delete", async (req, res) => {
       return res.status(404).json({ error: "해당 스토어ID의 데이터가 없습니다." });
     }
     await writeAllRows(kept);
+    setCache(kept);
     res.json({
       ok: true,
       deletedRows: existing.length - kept.length,
