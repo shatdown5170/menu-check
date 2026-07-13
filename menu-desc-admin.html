@@ -71,13 +71,17 @@
   .field-row{display:flex;gap:10px;margin-bottom:10px;}
   .field{flex:1;}
   .field label{display:block;font-size:12.5px;font-weight:700;color:var(--gray2);margin-bottom:5px;}
-  .field input{width:100%;padding:11px 13px;font-size:15px;border:1.5px solid var(--line);border-radius:10px;background:#FDFDFC;outline:none;}
-  .field input:focus{border-color:var(--blue);}
+  /* 입력란은 파란 톤으로 도드라지게 — 포커스하면 흰 배경으로 전환 */
+  .field input{width:100%;padding:12px 13px;font-size:15px;border:1.5px solid #A9DFF9;border-radius:10px;
+    background:var(--blue-soft);outline:none;transition:background .15s, border-color .15s;}
+  .field input::placeholder{color:#8FBDD4;}
+  .field input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(0,168,240,.12);}
 
-  textarea{width:100%;min-height:190px;padding:12px 14px;font-size:13.5px;border:1.5px solid var(--line);border-radius:10px;
-    background:#FDFDFC;outline:none;resize:vertical;line-height:1.6;
+  textarea{width:100%;min-height:190px;padding:12px 14px;font-size:13.5px;border:1.5px solid #A9DFF9;border-radius:10px;
+    background:var(--blue-soft);outline:none;resize:vertical;line-height:1.6;transition:background .15s, border-color .15s;
     font-family:"Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;}
-  textarea:focus{border-color:var(--blue);}
+  textarea::placeholder{color:#8FBDD4;}
+  textarea:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(0,168,240,.12);}
   #x-paste{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
   .or{display:flex;align-items:center;gap:10px;color:var(--gray);font-size:12.5px;margin:12px 0;}
   .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line);}

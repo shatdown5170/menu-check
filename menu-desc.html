@@ -169,9 +169,9 @@
   .img-page img{width:100%;border:1px solid var(--line2);border-radius:12px;display:block;}
   .img-page .pg-btns{display:flex;gap:8px;margin-top:8px;}
   .img-page .pg-btns button{flex:1;padding:13px;font-size:14px;font-weight:700;border:none;border-radius:10px;cursor:pointer;font-family:inherit;}
-  .pg-dl{background:var(--blue);color:#fff;}
-  .pg-dl:active{background:var(--blue-press);}
-  .pg-share{background:#F2F4F6;color:var(--ink);}
+  .pg-btns .pg-primary{background:var(--blue);color:#fff;}
+  .pg-btns .pg-primary:active{background:var(--blue-press);}
+  .pg-btns .pg-secondary{background:#F2F4F6;color:var(--ink);}
 
   /* ── 토스트 / 로딩 ── */
   .toast{position:absolute;left:50%;bottom:108px;transform:translateX(-50%) translateY(14px);z-index:30;
@@ -794,16 +794,21 @@ function showImageSheet(files){
   $("modal-title").textContent = files.length > 1 ? `이미지 저장 (${files.length}장)` : "이미지 저장";
   const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [new File([files[0].blob], files[0].name, { type: "image/png" })] }));
 
+  const tip = canShareFiles
+    ? `💡 <b>[사진에 저장]</b> → 뜨는 창에서 <b>'이미지 저장'</b>을 누르면 사진첩에 바로 들어가요.`
+    : `💡 [저장]이 동작하지 않으면 이미지를 <b>길게 눌러</b> '사진에 저장'을 선택하세요.`;
   $("modal-body").innerHTML =
-    `<div class="sheet-tip">💡 [저장]이 동작하지 않으면 이미지를 <b>길게 눌러</b> '사진에 저장'을 선택하세요.${
+    `<div class="sheet-tip">${tip}${
       files.length>1 ? "<br>내용이 길어 " + files.length + "장으로 나눠 생성했어요." : ""}</div>` +
     files.map((f,i)=>`
       <div class="img-page">
         ${files.length>1 ? `<div class="pg-label">${i+1} / ${files.length}</div>` : ""}
         <img src="${f.url}" alt="메뉴 설명 이미지 ${i+1}">
         <div class="pg-btns">
-          <button class="pg-dl" data-i="${i}">저장</button>
-          ${canShareFiles ? `<button class="pg-share" data-i="${i}">공유</button>` : ""}
+          ${canShareFiles
+            ? `<button class="pg-share pg-primary" data-i="${i}">사진에 저장</button>
+               <button class="pg-dl pg-secondary" data-i="${i}">파일로 저장</button>`
+            : `<button class="pg-dl pg-primary" data-i="${i}">저장</button>`}
         </div>
       </div>`).join("");
 
